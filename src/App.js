@@ -256,6 +256,14 @@ function Admin({ data, setData }) {
   const [tab, setTab] = useState("stocks");
   const [modal, setModal] = useState(null);
   const [newEmp, setNewEmp] = useState("");
+  const [newEmpTelegram, setNewEmpTelegram] = useState("");
+  const [editEmpId, setEditEmpId] = useState(null);
+  const [editTelegram, setEditTelegram] = useState("");
+  const [salaryEmpId, setSalaryEmpId] = useState(null);
+  const [salaryAmount, setSalaryAmount] = useState("");
+  const [salaryNote, setSalaryNote] = useState("");
+  const [editSaleId, setEditSaleId] = useState(null);
+  const [editSaleQty, setEditSaleQty] = useState("");
   const [cf, setCf] = useState({ buyer: "", resourceId: ALL_ITEMS[0].id, quantity: "", pricePerUnit: "", notes: "" });
   const [sf, setSf] = useState({ contractId: "", quantity: "" });
   const [ef, setEf] = useState({ category: EXPENSE_CATEGORIES[0], amount: "", description: "" });
@@ -292,12 +300,41 @@ function Admin({ data, setData }) {
   const tabs = [
     { id: "stocks", l: "📦 Stocks" }, { id: "employees", l: "🤠 Employés" }, { id: "productions", l: "⛏️ Extractions" },
     { id: "craft", l: "🔨 Fabrication" }, { id: "contracts", l: "📜 Contrats" }, { id: "sales", l: "💰 Ventes" },
-    { id: "expenses", l: "🧾 Dépenses" }, { id: "prices", l: "💲 Tarifs" }, { id: "summary", l: "📊 Bilan" },
+    { id: "expenses", l: "🧾 Dépenses" }, { id: "summary", l: "📊 Bilan" }, { id: "prices", l: "💲 Tarifs" },
   ];
 
-  const addEmp = async () => { if (!newEmp.trim()) return; if (data.employees.find(e => e.name.toLowerCase() === newEmp.trim().toLowerCase())) return; const u = { ...data, employees: [...data.employees, { id: gid(), name: newEmp.trim(), joinedAt: Date.now() }] }; setData(u); await saveData(u); setNewEmp(""); };
+  const addEmp = async () => { if (!newEmp.trim()) return; if (data.employees.find(e => e.name.toLowerCase() === newEmp.trim().toLowerCase())) return; const u = { ...data, employees: [...data.employees, { id: gid(), name: newEmp.trim(), telegram: newEmpTelegram.trim(), joinedAt: Date.now() }] }; setData(u); await saveData(u); setNewEmp(""); setNewEmpTelegram(""); };
   const rmEmp = async (id) => { const u = { ...data, employees: data.employees.filter(e => e.id !== id) }; setData(u); await saveData(u); };
   const rm = async (col, id) => { const u = { ...data, [col]: data[col].filter(x => x.id !== id) }; setData(u); await saveData(u); };
+
+  const saveTelegram = async (empId) => {
+    const u = { ...data, employees: data.employees.map(e => e.id === empId ? { ...e, telegram: editTelegram.trim() } : e) };
+    setData(u); await saveData(u); setEditEmpId(null);
+  };
+
+  const paySalary = async (empId) => {
+    const a = parseFloat(salaryAmount); if (!a || a <= 0) return;
+    const emp = data.employees.find(e => e.id === empId);
+    const expense = { id: gid(), category: "Salaires", amount: a, description: `Salaire — ${emp?.name}${salaryNote ? ` (${salaryNote})` : ""}`, employeeId: empId, timestamp: Date.now() };
+    const u = { ...data, expenses: [...data.expenses, expense] };
+    setData(u); await saveData(u); setSalaryEmpId(null); setSalaryAmount(""); setSalaryNote("");
+  };
+
+  const editSale = async (saleId) => {
+    const newQty = parseFloat(editSaleQty); if (!newQty || newQty <= 0) return;
+    const sale = data.sales.find(s => s.id === saleId); if (!sale) return;
+    const diff = newQty - sale.quantity;
+    const updatedSales = data.sales.map(s => s.id === saleId ? { ...s, quantity: newQty, totalPrice: newQty * s.pricePerUnit } : s);
+    const updatedContracts = data.contracts.map(c => {
+      if (c.id === sale.contractId) {
+        const newDelivered = c.deliveredQuantity + diff;
+        return { ...c, deliveredQuantity: newDelivered, status: newDelivered >= c.totalQuantity ? "completed" : "active" };
+      }
+      return c;
+    });
+    const u = { ...data, sales: updatedSales, contracts: updatedContracts };
+    setData(u); await saveData(u); setEditSaleId(null); setEditSaleQty("");
+  };
 
   const addContract = async () => {
     const q = parseFloat(cf.quantity), p = parseFloat(cf.pricePerUnit);
@@ -346,13 +383,13 @@ function Admin({ data, setData }) {
 
   return (
     <div style={{ padding: "0 28px 32px" }}>
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", padding: "16px 0", marginBottom: 24, borderBottom: `2px solid ${C.border}` }}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: "16px 0", marginBottom: 24, borderBottom: `2px solid ${C.border}` }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             background: tab === t.id ? `linear-gradient(180deg,rgba(139,58,26,.3),rgba(139,58,26,.1))` : "transparent",
             border: `2px solid ${tab === t.id ? C.accentLt : C.border}`, borderRadius: 3,
-            color: tab === t.id ? C.gold : C.muted, padding: "12px 18px", cursor: "pointer",
-            fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: tab === t.id ? 700 : 400, whiteSpace: "nowrap",
+            color: tab === t.id ? C.gold : C.muted, padding: "10px 14px", cursor: "pointer",
+            fontFamily: "'Playfair Display',serif", fontSize: 14, fontWeight: tab === t.id ? 700 : 400, whiteSpace: "nowrap",
           }}>{t.l}</button>
         ))}
       </div>
@@ -396,23 +433,77 @@ function Admin({ data, setData }) {
       {/* EMPLOYEES */}
       {tab === "employees" && <div style={{ animation: "fadeIn .4s" }}>
         <Title icon="🤠">Employés ({data.employees.length})</Title>
-        <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
-          <input value={newEmp} onChange={e => setNewEmp(e.target.value)} placeholder="Nom du nouvel employé" style={{ ...inp, flex: 1 }} onKeyDown={e => e.key === "Enter" && addEmp()} />
-          <button onClick={addEmp} style={btnP}>AJOUTER</button>
-        </div>
+        <Card style={{ marginBottom: 24 }}><div style={{ padding: 22 }}>
+          <h4 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 700, margin: "0 0 14px" }}>Ajouter un employé</h4>
+          <div style={{ display: "grid", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10 }}>
+              <input value={newEmp} onChange={e => setNewEmp(e.target.value)} placeholder="Nom de l'employé" style={{ ...inp, flex: 1 }} onKeyDown={e => e.key === "Enter" && addEmp()} />
+              <input value={newEmpTelegram} onChange={e => setNewEmpTelegram(e.target.value)} placeholder="N° Télégramme (optionnel)" style={{ ...inp, flex: 1 }} />
+            </div>
+            <button onClick={addEmp} style={btnP}>AJOUTER</button>
+          </div>
+        </div></Card>
         {data.employees.length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucun employé.</p>
           : <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {data.employees.map(emp => {
               const tots = {}; data.productions.filter(p => p.employeeName.toLowerCase() === emp.name.toLowerCase()).forEach(p => { tots[p.resourceId] = (tots[p.resourceId] || 0) + p.quantity; });
-              return <Card key={emp.id}><div style={{ padding: 22, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ color: C.goldLt, fontWeight: 700, fontSize: 22, fontFamily: "'Playfair Display',serif" }}>{emp.name}</div>
-                  <div style={{ color: C.dark, fontSize: 15, marginTop: 4 }}>Embauché le {fmtDate(emp.joinedAt)}</div>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
-                    {Object.entries(tots).map(([id, q]) => { const r = ALL_ITEMS.find(x => x.id === id); return <span key={id} style={{ background: "rgba(201,168,76,.1)", border: `1px solid ${C.border}`, padding: "5px 14px", borderRadius: 3, fontSize: 16, color: r?.color, fontWeight: 600 }}>{r?.icon} ×{Math.floor(q)}</span>; })}
+              const empSalaries = data.expenses.filter(e => e.employeeId === emp.id && e.category === "Salaires");
+              const totalSalary = empSalaries.reduce((s, e) => s + e.amount, 0);
+              return <Card key={emp.id}><div style={{ padding: 22 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: C.goldLt, fontWeight: 700, fontSize: 22, fontFamily: "'Playfair Display',serif" }}>{emp.name}</div>
+                    <div style={{ color: C.dark, fontSize: 15, marginTop: 4 }}>Embauché le {fmtDate(emp.joinedAt)}</div>
+
+                    {/* Telegram */}
+                    <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ color: C.muted, fontSize: 14 }}>📨 Télégramme :</span>
+                      {editEmpId === emp.id ? (
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <input value={editTelegram} onChange={e => setEditTelegram(e.target.value)} style={{ ...inp, padding: "6px 10px", fontSize: 14, width: 160 }} />
+                          <button onClick={() => saveTelegram(emp.id)} style={{ ...btnP, padding: "6px 12px", fontSize: 12 }}>OK</button>
+                          <button onClick={() => setEditEmpId(null)} style={{ ...btnS, padding: "6px 10px", fontSize: 12 }}>✕</button>
+                        </div>
+                      ) : (
+                        <span>
+                          <span style={{ color: emp.telegram ? C.goldLt : C.dark, fontSize: 15 }}>{emp.telegram || "Non renseigné"}</span>
+                          <button onClick={() => { setEditEmpId(emp.id); setEditTelegram(emp.telegram || ""); }} style={{ ...btnS, padding: "2px 8px", fontSize: 12, marginLeft: 6, color: C.gold, borderColor: C.goldDk }}>✏️</button>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Production totals */}
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+                      {Object.entries(tots).map(([id, q]) => { const r = ALL_ITEMS.find(x => x.id === id); return <span key={id} style={{ background: "rgba(201,168,76,.1)", border: `1px solid ${C.border}`, padding: "5px 14px", borderRadius: 3, fontSize: 16, color: r?.color, fontWeight: 600 }}>{r?.icon} ×{Math.floor(q)}</span>; })}
+                    </div>
+
+                    {/* Salary section */}
+                    <div style={{ marginTop: 12, padding: "10px 14px", background: "rgba(0,0,0,.2)", borderRadius: 4, border: `1px solid ${C.border}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: C.muted, fontSize: 15 }}>💰 Total salaires versés : <strong style={{ color: C.gold, fontSize: 18 }}>${totalSalary.toFixed(2)}</strong></span>
+                        <button onClick={() => { setSalaryEmpId(salaryEmpId === emp.id ? null : emp.id); setSalaryAmount(""); setSalaryNote(""); }} style={{ ...btnP, padding: "6px 14px", fontSize: 12 }}>{salaryEmpId === emp.id ? "ANNULER" : "+ SALAIRE"}</button>
+                      </div>
+                      {salaryEmpId === emp.id && (
+                        <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                          <input type="number" value={salaryAmount} onChange={e => setSalaryAmount(e.target.value)} placeholder="Montant ($)" style={inp} min="0" step="0.01" />
+                          <input value={salaryNote} onChange={e => setSalaryNote(e.target.value)} placeholder="Note (optionnel)" style={inp} />
+                          <button onClick={() => paySalary(emp.id)} style={{ ...btnP, padding: "10px 20px" }}>VERSER LE SALAIRE</button>
+                        </div>
+                      )}
+                      {empSalaries.length > 0 && (
+                        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                          {empSalaries.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5).map(s => (
+                            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14 }}>
+                              <span style={{ color: C.muted }}>{fmtDT(s.timestamp)} — <strong style={{ color: C.redLt }}>${s.amount.toFixed(2)}</strong>{s.description.includes("(") && <span style={{ color: C.dark }}> {s.description.split("(").slice(1).join("(").replace(")", "")}</span>}</span>
+                              <button onClick={() => rm("expenses", s.id)} style={{ ...btnD, padding: "2px 8px", fontSize: 11 }}>✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  <button onClick={() => rmEmp(emp.id)} style={{ ...btnD, marginLeft: 12 }}>✕</button>
                 </div>
-                <button onClick={() => rmEmp(emp.id)} style={btnD}>✕</button>
               </div></Card>;
             })}
           </div>}
@@ -509,7 +600,24 @@ function Admin({ data, setData }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}><Title icon="💰">Ventes</Title><button onClick={() => setModal("addSale")} style={btnP}>+ VENTE</button></div>
         {data.sales.length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucune vente.</p>
           : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {[...data.sales].sort((a, b) => b.timestamp - a.timestamp).map(s => { const r = ALL_ITEMS.find(x => x.id === s.resourceId); return <Row key={s.id}><div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 18 }}><span style={{ color: C.greenLt, fontWeight: 700, fontSize: 22 }}>${s.totalPrice.toFixed(2)}</span><span style={{ color: C.dark }}>—</span><span style={{ color: r?.color }}>{r?.icon} ×{s.quantity} {r?.name}</span><span style={{ color: C.muted }}>→ {s.buyer}</span></div><div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(s.timestamp)}</span><button onClick={() => rm("sales", s.id)} style={{ ...btnD, padding: "4px 10px", fontSize: 13 }}>✕</button></div></Row>; })}
+            {[...data.sales].sort((a, b) => b.timestamp - a.timestamp).map(s => { const r = ALL_ITEMS.find(x => x.id === s.resourceId);
+              if (editSaleId === s.id) {
+                return <Card key={s.id} style={{ border: `2px solid ${C.accentLt}` }}><div style={{ padding: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <span style={{ color: C.gold, fontWeight: 700, fontSize: 16, fontFamily: "'Playfair Display',serif" }}>✏️ Corriger la quantité</span>
+                    <span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(s.timestamp)} — {s.buyer}</span>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 15, marginBottom: 8 }}>{r?.icon} {r?.name} — Quantité actuelle : <strong style={{ color: C.goldLt }}>{s.quantity}</strong> @ ${s.pricePerUnit.toFixed(2)}/u</div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <input type="number" value={editSaleQty} onChange={e => setEditSaleQty(e.target.value)} placeholder="Nouvelle quantité" style={{ ...inp, flex: 1 }} min="0" step="1" />
+                    <button onClick={() => editSale(s.id)} style={{ ...btnP, padding: "12px 20px" }}>CORRIGER</button>
+                    <button onClick={() => setEditSaleId(null)} style={{ ...btnS, padding: "12px 16px" }}>ANNULER</button>
+                  </div>
+                  {editSaleQty && <div style={{ color: C.muted, fontSize: 14, marginTop: 8 }}>Nouveau total : <strong style={{ color: C.greenLt }}>${((parseFloat(editSaleQty) || 0) * s.pricePerUnit).toFixed(2)}</strong> (diff stock : {((parseFloat(editSaleQty) || 0) - s.quantity) > 0 ? "+" : ""}{((parseFloat(editSaleQty) || 0) - s.quantity)})</div>}
+                </div></Card>;
+              }
+              return <Row key={s.id}><div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 18 }}><span style={{ color: C.greenLt, fontWeight: 700, fontSize: 22 }}>${s.totalPrice.toFixed(2)}</span><span style={{ color: C.dark }}>—</span><span style={{ color: r?.color }}>{r?.icon} ×{s.quantity} {r?.name}</span><span style={{ color: C.muted }}>→ {s.buyer}</span></div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(s.timestamp)}</span><button onClick={() => { setEditSaleId(s.id); setEditSaleQty(String(s.quantity)); }} style={{ ...btnS, padding: "4px 10px", fontSize: 13, color: C.gold, borderColor: C.goldDk }}>✏️</button><button onClick={() => rm("sales", s.id)} style={{ ...btnD, padding: "4px 10px", fontSize: 13 }}>✕</button></div></Row>;
+            })}
           </div>}
       </div>}
 
