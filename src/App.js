@@ -208,6 +208,36 @@ function EmployeeView({ name, data, setData }) {
           </div>
         </div>
       </Card>
+      {/* Salary display - read only */}
+      {(() => {
+        const emp = data.employees.find(e => e.name.toLowerCase() === name.toLowerCase());
+        const mySalaries = emp ? data.expenses.filter(e => e.employeeId === emp.id && e.category === "Salaires") : [];
+        const totalSalary = mySalaries.reduce((s, e) => s + e.amount, 0);
+        return (
+          <Card style={{ marginTop: 24 }}>
+            <div style={{ padding: 22 }}>
+              <h3 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 800, margin: "0 0 12px" }}>💰 Mes salaires</h3>
+              <Divider />
+              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 16 }}>
+                <span style={{ color: C.muted, fontSize: 17 }}>Total perçu :</span>
+                <span style={{ color: C.greenLt, fontSize: 32, fontFamily: "'Playfair Display',serif", fontWeight: 900 }}>${totalSalary.toFixed(2)}</span>
+              </div>
+              {mySalaries.length > 0 && (
+                <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {mySalaries.sort((a, b) => b.timestamp - a.timestamp).map(s => (
+                    <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 14px", background: "rgba(0,0,0,.2)", borderRadius: 4, border: `1px solid ${C.border}` }}>
+                      <span style={{ color: C.greenLt, fontWeight: 700, fontSize: 17 }}>${s.amount.toFixed(2)}</span>
+                      <span style={{ color: C.dark, fontSize: 14 }}>{fmtDT(s.timestamp)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {mySalaries.length === 0 && <p style={{ color: C.dark, fontStyle: "italic", fontSize: 15, marginTop: 8 }}>Aucun salaire versé pour le moment.</p>}
+            </div>
+          </Card>
+        );
+      })()}
+
       <div style={{ marginTop: 32 }}>
         <Title icon="📋">Mes productions récentes</Title>
         {my.length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucune production enregistrée.</p>
@@ -408,26 +438,6 @@ function Admin({ data, setData }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 16, marginBottom: 32 }}>
           {CRAFTED_PRODUCTS.map(r => <Card key={r.id}><div style={{ padding: 28, textAlign: "center" }}><div style={{ fontSize: 48, marginBottom: 8 }}>{r.icon}</div><div style={{ color: r.color, fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700 }}>{r.name}</div><div style={{ color: C.goldLt, fontSize: 44, fontFamily: "'Playfair Display',serif", fontWeight: 900, marginTop: 10, textShadow: "0 2px 8px rgba(0,0,0,.3)" }}>{Math.floor(stocks[r.id] || 0)}</div><div style={{ marginTop: 8 }}><PTag id={r.id} big /></div></div></Card>)}
         </div>
-        {/* Adjustment history */}
-        {(data.stockAdjustments || []).length > 0 && <>
-          <h4 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, margin: "0 0 14px" }}>Historique des ajustements</h4>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {[...(data.stockAdjustments || [])].sort((a, b) => b.timestamp - a.timestamp).slice(0, 30).map(a => {
-              const it = ALL_ITEMS.find(x => x.id === a.itemId);
-              return <Row key={a.id}>
-                <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 17 }}>
-                  <span style={{ color: a.quantity > 0 ? C.greenLt : C.redLt, fontWeight: 700, fontSize: 20 }}>{a.quantity > 0 ? "+" : ""}{a.quantity}</span>
-                  <span style={{ color: it?.color }}>{it?.icon} {it?.name}</span>
-                  {a.note && <span style={{ color: C.dark }}>— {a.note}</span>}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(a.timestamp)}</span>
-                  <button onClick={() => rm("stockAdjustments", a.id)} style={{ ...btnD, padding: "4px 10px", fontSize: 13 }}>✕</button>
-                </div>
-              </Row>;
-            })}
-          </div>
-        </>}
       </div>}
 
       {/* EMPLOYEES */}
@@ -772,16 +782,17 @@ export default function App() {
   const [err, setErr] = useState("");
 
   useEffect(() => {
+    const toArr = (v) => { if (!v) return []; if (Array.isArray(v)) return v.filter(Boolean); return Object.values(v).filter(Boolean); };
     const unsubscribe = listenData((val) => {
       if (val) {
         setData({
-          employees: val.employees || [],
-          productions: val.productions || [],
-          crafts: val.crafts || [],
-          contracts: val.contracts || [],
-          sales: val.sales || [],
-          expenses: val.expenses || [],
-          stockAdjustments: val.stockAdjustments || [],
+          employees: toArr(val.employees),
+          productions: toArr(val.productions),
+          crafts: toArr(val.crafts),
+          contracts: toArr(val.contracts),
+          sales: toArr(val.sales),
+          expenses: toArr(val.expenses),
+          stockAdjustments: toArr(val.stockAdjustments),
         });
       }
       setLoading(false);
