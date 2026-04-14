@@ -265,8 +265,30 @@ function Admin({ data, setData }) {
   const [adjItem, setAdjItem] = useState(ALL_ITEMS[0].id);
   const [adjQty, setAdjQty] = useState("");
   const [adjNote, setAdjNote] = useState("");
+  const [weekOffset, setWeekOffset] = useState(0);
 
   const stocks = computeStocks(data);
+
+  // ── Weekly bilan helpers ──
+  function getWeekBounds(offset) {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToMonday = (day === 0 ? -6 : 1 - day);
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday + (offset * 7));
+    monday.setHours(0, 0, 1, 0);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    return { start: monday.getTime(), end: sunday.getTime(), mondayDate: new Date(monday), sundayDate: new Date(sunday) };
+  }
+  const week = getWeekBounds(weekOffset);
+  const fmtShort = (d) => d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const weekSales = data.sales.filter(s => s.timestamp >= week.start && s.timestamp <= week.end);
+  const weekExpenses = data.expenses.filter(e => e.timestamp >= week.start && e.timestamp <= week.end);
+  const weekRev = weekSales.reduce((s, x) => s + x.totalPrice, 0);
+  const weekExp = weekExpenses.reduce((s, x) => s + x.amount, 0);
+  const weekProfit = weekRev - weekExp;
   const tabs = [
     { id: "stocks", l: "📦 Stocks" }, { id: "employees", l: "🤠 Employés" }, { id: "productions", l: "⛏️ Extractions" },
     { id: "craft", l: "🔨 Fabrication" }, { id: "contracts", l: "📜 Contrats" }, { id: "sales", l: "💰 Ventes" },
@@ -517,18 +539,62 @@ function Admin({ data, setData }) {
       {/* SUMMARY */}
       {tab === "summary" && <div style={{ animation: "fadeIn .4s" }}>
         <Title icon="📊">Bilan Financier</Title>
+
+        {/* Week navigator */}
+        <Card style={{ marginBottom: 24 }}>
+          <div style={{ padding: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <button onClick={() => setWeekOffset(weekOffset - 1)} style={{ ...btnS, fontSize: 20, padding: "8px 18px" }}>◀</button>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700 }}>
+                {weekOffset === 0 ? "📅 Semaine en cours" : `📅 Semaine du ${fmtShort(week.mondayDate)}`}
+              </div>
+              <div style={{ color: C.muted, fontSize: 15, marginTop: 4 }}>
+                Lundi {fmtShort(week.mondayDate)} → Dimanche {fmtShort(week.sundayDate)}
+              </div>
+            </div>
+            <button onClick={() => setWeekOffset(weekOffset + 1)} disabled={weekOffset >= 0} style={{ ...btnS, fontSize: 20, padding: "8px 18px", opacity: weekOffset >= 0 ? 0.3 : 1 }}>▶</button>
+          </div>
+        </Card>
+
+        {/* Weekly totals */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 16, marginBottom: 32 }}>
-          <Card><div style={{ padding: 30, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 17, marginBottom: 8, fontWeight: 600 }}>Recettes</div><div style={{ color: C.greenLt, fontSize: 42, fontFamily: "'Playfair Display',serif", fontWeight: 900, textShadow: "0 2px 8px rgba(0,0,0,.3)" }}>${totalRev.toFixed(2)}</div></div></Card>
-          <Card><div style={{ padding: 30, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 17, marginBottom: 8, fontWeight: 600 }}>Dépenses</div><div style={{ color: C.redLt, fontSize: 42, fontFamily: "'Playfair Display',serif", fontWeight: 900, textShadow: "0 2px 8px rgba(0,0,0,.3)" }}>${totalExp.toFixed(2)}</div></div></Card>
-          <Card><div style={{ padding: 30, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 17, marginBottom: 8, fontWeight: 600 }}>Bénéfice</div><div style={{ color: profit >= 0 ? C.greenLt : C.redLt, fontSize: 42, fontFamily: "'Playfair Display',serif", fontWeight: 900, textShadow: "0 2px 8px rgba(0,0,0,.3)" }}>{profit >= 0 ? "+" : ""}${profit.toFixed(2)}</div></div></Card>
+          <Card><div style={{ padding: 30, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 17, marginBottom: 8, fontWeight: 600 }}>Recettes (semaine)</div><div style={{ color: C.greenLt, fontSize: 42, fontFamily: "'Playfair Display',serif", fontWeight: 900, textShadow: "0 2px 8px rgba(0,0,0,.3)" }}>${weekRev.toFixed(2)}</div></div></Card>
+          <Card><div style={{ padding: 30, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 17, marginBottom: 8, fontWeight: 600 }}>Dépenses (semaine)</div><div style={{ color: C.redLt, fontSize: 42, fontFamily: "'Playfair Display',serif", fontWeight: 900, textShadow: "0 2px 8px rgba(0,0,0,.3)" }}>${weekExp.toFixed(2)}</div></div></Card>
+          <Card><div style={{ padding: 30, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 17, marginBottom: 8, fontWeight: 600 }}>Bénéfice (semaine)</div><div style={{ color: weekProfit >= 0 ? C.greenLt : C.redLt, fontSize: 42, fontFamily: "'Playfair Display',serif", fontWeight: 900, textShadow: "0 2px 8px rgba(0,0,0,.3)" }}>{weekProfit >= 0 ? "+" : ""}${weekProfit.toFixed(2)}</div></div></Card>
         </div>
+
+        {/* Weekly sales detail */}
+        <h4 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, margin: "0 0 14px" }}>Ventes de la semaine ({weekSales.length})</h4>
+        {weekSales.length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17, marginBottom: 24 }}>Aucune vente cette semaine.</p>
+          : <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
+            {weekSales.sort((a, b) => b.timestamp - a.timestamp).map(s => { const r = ALL_ITEMS.find(x => x.id === s.resourceId); return <Row key={s.id}><div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 17 }}><span style={{ color: C.greenLt, fontWeight: 700, fontSize: 20 }}>${s.totalPrice.toFixed(2)}</span><span style={{ color: C.dark }}>—</span><span style={{ color: r?.color }}>{r?.icon} ×{s.quantity} {r?.name}</span><span style={{ color: C.muted }}>→ {s.buyer}</span></div><span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(s.timestamp)}</span></Row>; })}
+          </div>}
+
+        {/* Weekly expenses detail */}
+        <h4 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, margin: "0 0 14px" }}>Dépenses de la semaine ({weekExpenses.length})</h4>
+        {weekExpenses.length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17, marginBottom: 24 }}>Aucune dépense cette semaine.</p>
+          : <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
+            {weekExpenses.sort((a, b) => b.timestamp - a.timestamp).map(x => <Row key={x.id}><div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 17 }}><span style={{ color: C.redLt, fontWeight: 700, fontSize: 20 }}>-${x.amount.toFixed(2)}</span><span style={{ color: C.dark }}>—</span><span style={{ color: C.muted, fontWeight: 600 }}>{x.category}</span><span style={{ color: C.dark }}>{x.description}</span></div><span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(x.timestamp)}</span></Row>)}
+          </div>}
+
+        {/* Weekly expenses by category */}
+        <h4 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, margin: "0 0 14px" }}>Dépenses par catégorie (semaine)</h4>
+        {(() => { const bc = {}; weekExpenses.forEach(e => { bc[e.category] = (bc[e.category] || 0) + e.amount; }); const en = Object.entries(bc).sort((a, b) => b[1] - a[1]); if (!en.length) return <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17, marginBottom: 24 }}>Aucune.</p>; return <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>{en.map(([c, a]) => <Row key={c}><span style={{ color: C.goldLt, fontSize: 17 }}>{c}</span><span style={{ color: C.redLt, fontWeight: 700, fontSize: 18 }}>${a.toFixed(2)}</span></Row>)}</div>; })()}
+
+        {/* Global totals */}
+        <Divider />
+        <h4 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, margin: "16px 0 14px" }}>Totaux depuis l'ouverture</h4>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 16, marginBottom: 24 }}>
+          <Card><div style={{ padding: 20, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 15, marginBottom: 4 }}>Recettes totales</div><div style={{ color: C.greenLt, fontSize: 28, fontFamily: "'Playfair Display',serif", fontWeight: 900 }}>${totalRev.toFixed(2)}</div></div></Card>
+          <Card><div style={{ padding: 20, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 15, marginBottom: 4 }}>Dépenses totales</div><div style={{ color: C.redLt, fontSize: 28, fontFamily: "'Playfair Display',serif", fontWeight: 900 }}>${totalExp.toFixed(2)}</div></div></Card>
+          <Card><div style={{ padding: 20, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 15, marginBottom: 4 }}>Bénéfice total</div><div style={{ color: profit >= 0 ? C.greenLt : C.redLt, fontSize: 28, fontFamily: "'Playfair Display',serif", fontWeight: 900 }}>{profit >= 0 ? "+" : ""}${profit.toFixed(2)}</div></div></Card>
+        </div>
+
         <h4 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, margin: "0 0 14px" }}>Contrats actifs</h4>
         {data.contracts.filter(c => c.status === "active").length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucun.</p>
           : <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
             {data.contracts.filter(c => c.status === "active").map(c => { const r = ALL_ITEMS.find(x => x.id === c.resourceId); const rem = c.totalQuantity - c.deliveredQuantity; return <Row key={c.id}><div style={{ fontSize: 18 }}><span style={{ color: C.goldLt, fontWeight: 700 }}>{c.buyer}</span><span style={{ color: C.muted, marginLeft: 14 }}>reste {rem} {r?.name}</span><span style={{ color: C.greenLt, marginLeft: 14, fontWeight: 700 }}>(${(rem * c.pricePerUnit).toFixed(2)})</span></div></Row>; })}
           </div>}
-        <h4 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, margin: "0 0 14px" }}>Dépenses par catégorie</h4>
-        {(() => { const bc = {}; data.expenses.forEach(e => { bc[e.category] = (bc[e.category] || 0) + e.amount; }); const en = Object.entries(bc).sort((a, b) => b[1] - a[1]); if (!en.length) return <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucune.</p>; return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{en.map(([c, a]) => <Row key={c}><span style={{ color: C.goldLt, fontSize: 17 }}>{c}</span><span style={{ color: C.redLt, fontWeight: 700, fontSize: 18 }}>${a.toFixed(2)}</span></Row>)}</div>; })()}
       </div>}
 
       {/* MODALS */}
