@@ -17,6 +17,7 @@ const CRAFTED_PRODUCTS = [
   { id: "tete_outil", name: "Tête d'outil", unit: "unité", icon: "🔨", color: "#CD853F" },
   { id: "clous", name: "Clous", unit: "unité", icon: "📌", color: "#808080" },
   { id: "jarres", name: "Jarres vides", unit: "unité", icon: "🏺", color: "#C4A882" },
+  { id: "pioches", name: "Pioches", unit: "unité", icon: "⛏️", color: "#8B6914" },
 ];
 
 const ALL_ITEMS = [...RAW_RESOURCES, ...CRAFTED_PRODUCTS];
@@ -38,14 +39,15 @@ const PRICE_INFO = {
   charbon: { min: 0.8, max: 1, export: true },
   tete_outil: { min: 3, max: 3.3, export: false },
   clous: { min: 0, max: 0.2, export: false },
-  jarres: { min: null, max: null, export: false, libre: true },
+  jarres: { min: 0, max: 0.05, export: false },
+  pioches: { min: null, max: null, export: false, libre: true },
   minerai_fer: { min: null, max: null, export: false, libre: true },
   minerai_acier: { min: null, max: null, export: false, libre: true },
 };
 
 const EXPENSE_CATEGORIES = ["Pioches & Outils","Dynamite & Explosifs","Bois de soutènement","Équipement de sécurité","Transport & Chariots","Salaires","Nourriture & Provisions","Matériel divers","Taxes"];
 
-const initState = () => ({ employees: [], productions: [], crafts: [], contracts: [], sales: [], expenses: [] });
+const initState = () => ({ employees: [], productions: [], crafts: [], contracts: [], sales: [], expenses: [], stockAdjustments: [] });
 function gid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function fmtDate(ts) { if (!ts) return "—"; return new Date(ts).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }); }
 function fmtDT(ts) { if (!ts) return "—"; const d = new Date(ts); return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); }
@@ -61,6 +63,7 @@ function computeStocks(data) {
     recipe.outputs.forEach(out => { s[out.itemId] = (s[out.itemId] || 0) + (out.qty * c.multiplier); });
   });
   (data.sales || []).forEach(x => { s[x.resourceId] = (s[x.resourceId] || 0) - x.quantity; });
+  (data.stockAdjustments || []).forEach(a => { s[a.itemId] = (s[a.itemId] || 0) + a.quantity; });
   return s;
 }
 
@@ -259,6 +262,9 @@ function Admin({ data, setData }) {
   const [pf, setPf] = useState({ employeeName: "", resourceId: RAW_RESOURCES[0].id, quantity: "", note: "" });
   const [cr, setCr] = useState(RECIPES[0].id);
   const [cm, setCm] = useState("1");
+  const [adjItem, setAdjItem] = useState(ALL_ITEMS[0].id);
+  const [adjQty, setAdjQty] = useState("");
+  const [adjNote, setAdjNote] = useState("");
 
   const stocks = computeStocks(data);
   const tabs = [
@@ -300,6 +306,13 @@ function Admin({ data, setData }) {
     setData(u); await saveData(u); setCm("1");
   };
 
+  const adjustStock = async () => {
+    const q = parseFloat(adjQty); if (!q) return;
+    const adj = { id: gid(), itemId: adjItem, quantity: q, note: adjNote.trim() || "Ajustement manuel", timestamp: Date.now() };
+    const u = { ...data, stockAdjustments: [...(data.stockAdjustments || []), adj] };
+    setData(u); await saveData(u); setAdjQty(""); setAdjNote(""); setModal(null);
+  };
+
   const totalRev = data.sales.reduce((s, x) => s + x.totalPrice, 0);
   const totalExp = data.expenses.reduce((s, x) => s + x.amount, 0);
   const profit = totalRev - totalExp;
@@ -324,14 +337,38 @@ function Admin({ data, setData }) {
 
       {/* STOCKS */}
       {tab === "stocks" && <div style={{ animation: "fadeIn .4s" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+          <Title icon="📦">Stocks</Title>
+          <button onClick={() => setModal("adjustStock")} style={btnP}>±  AJUSTER UN STOCK</button>
+        </div>
         <Title icon="⛏️">Matières Premières</Title>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 16, marginBottom: 32 }}>
           {RAW_RESOURCES.map(r => <Card key={r.id}><div style={{ padding: 28, textAlign: "center" }}><div style={{ fontSize: 48, marginBottom: 8 }}>{r.icon}</div><div style={{ color: r.color, fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700 }}>{r.name}</div><div style={{ color: C.goldLt, fontSize: 44, fontFamily: "'Playfair Display',serif", fontWeight: 900, marginTop: 10, textShadow: "0 2px 8px rgba(0,0,0,.3)" }}>{Math.floor(stocks[r.id] || 0)}</div><div style={{ marginTop: 8 }}><PTag id={r.id} big /></div></div></Card>)}
         </div>
         <Title icon="🔨">Produits Fabriqués</Title>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 16, marginBottom: 32 }}>
           {CRAFTED_PRODUCTS.map(r => <Card key={r.id}><div style={{ padding: 28, textAlign: "center" }}><div style={{ fontSize: 48, marginBottom: 8 }}>{r.icon}</div><div style={{ color: r.color, fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700 }}>{r.name}</div><div style={{ color: C.goldLt, fontSize: 44, fontFamily: "'Playfair Display',serif", fontWeight: 900, marginTop: 10, textShadow: "0 2px 8px rgba(0,0,0,.3)" }}>{Math.floor(stocks[r.id] || 0)}</div><div style={{ marginTop: 8 }}><PTag id={r.id} big /></div></div></Card>)}
         </div>
+        {/* Adjustment history */}
+        {(data.stockAdjustments || []).length > 0 && <>
+          <h4 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, margin: "0 0 14px" }}>Historique des ajustements</h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {[...(data.stockAdjustments || [])].sort((a, b) => b.timestamp - a.timestamp).slice(0, 30).map(a => {
+              const it = ALL_ITEMS.find(x => x.id === a.itemId);
+              return <Row key={a.id}>
+                <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 17 }}>
+                  <span style={{ color: a.quantity > 0 ? C.greenLt : C.redLt, fontWeight: 700, fontSize: 20 }}>{a.quantity > 0 ? "+" : ""}{a.quantity}</span>
+                  <span style={{ color: it?.color }}>{it?.icon} {it?.name}</span>
+                  {a.note && <span style={{ color: C.dark }}>— {a.note}</span>}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(a.timestamp)}</span>
+                  <button onClick={() => rm("stockAdjustments", a.id)} style={{ ...btnD, padding: "4px 10px", fontSize: 13 }}>✕</button>
+                </div>
+              </Row>;
+            })}
+          </div>
+        </>}
       </div>}
 
       {/* EMPLOYEES */}
@@ -533,6 +570,20 @@ function Admin({ data, setData }) {
           <button onClick={addProd} style={{ ...btnP, fontSize: 16, padding: "16px 32px" }}>AJOUTER</button>
         </div>
       </Modal>
+
+      <Modal open={modal === "adjustStock"} onClose={() => setModal(null)} title="Ajuster un stock manuellement">
+        <div style={{ display: "grid", gap: 16 }}>
+          <div>{lbl("Objet")}<select value={adjItem} onChange={e => setAdjItem(e.target.value)} style={sel}>{ALL_ITEMS.map(r => { const st = stocks[r.id] || 0; return <option key={r.id} value={r.id}>{r.icon} {r.name} (stock: {Math.floor(st)})</option>; })}</select></div>
+          <div style={{ background: "rgba(0,0,0,.3)", padding: 14, borderRadius: 4, border: `1px solid ${C.border}` }}>
+            <div style={{ color: C.muted, fontSize: 15 }}>Stock actuel de <strong style={{ color: C.goldLt }}>{ALL_ITEMS.find(x => x.id === adjItem)?.name}</strong> :</div>
+            <div style={{ color: C.gold, fontSize: 28, fontFamily: "'Playfair Display',serif", fontWeight: 900, marginTop: 4 }}>{Math.floor(stocks[adjItem] || 0)}</div>
+          </div>
+          <div>{lbl("Ajustement (+ pour ajouter, - pour retirer)")}<input type="number" value={adjQty} onChange={e => setAdjQty(e.target.value)} placeholder="Ex: 10 ou -5" style={inp} /></div>
+          {adjQty && <div style={{ color: C.muted, fontSize: 15 }}>Nouveau stock : <strong style={{ color: (Math.floor(stocks[adjItem] || 0) + (parseFloat(adjQty) || 0)) >= 0 ? C.greenLt : C.redLt, fontSize: 20 }}>{Math.floor(stocks[adjItem] || 0) + (parseFloat(adjQty) || 0)}</strong></div>}
+          <div>{lbl("Raison")}<input value={adjNote} onChange={e => setAdjNote(e.target.value)} placeholder="Ex: Correction inventaire, Achat pioches..." style={inp} /></div>
+          <button onClick={adjustStock} style={{ ...btnP, fontSize: 16, padding: "16px 32px" }}>APPLIQUER L'AJUSTEMENT</button>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -556,6 +607,7 @@ export default function App() {
           contracts: val.contracts || [],
           sales: val.sales || [],
           expenses: val.expenses || [],
+          stockAdjustments: val.stockAdjustments || [],
         });
       }
       setLoading(false);
