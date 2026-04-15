@@ -419,7 +419,7 @@ function Admin({ data, setData }) {
   const profit = totalRev - totalExp;
   const selRecipe = RECIPES.find(r => r.id === cr);
   const cMult = parseInt(cm) || 1;
-  const sellable = ALL_ITEMS.filter(i => PRICE_INFO[i.id]);
+  const sellable = ALL_ITEMS.filter(i => PRICE_INFO[i.id] && i.id !== "minerai_fer" && i.id !== "minerai_acier");
 
   const lbl = (t) => <label style={{ color: C.muted, fontSize: 16, display: "block", marginBottom: 6, fontWeight: 600 }}>{t}</label>;
 
