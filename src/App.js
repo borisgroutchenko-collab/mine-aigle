@@ -396,8 +396,11 @@ function Admin({ data, setData }) {
   };
 
   const adjustStock = async () => {
-    const q = parseFloat(adjQty); if (!q) return;
-    const adj = { id: gid(), itemId: adjItem, quantity: q, note: adjNote.trim() || "Ajustement manuel", timestamp: Date.now() };
+    const target = parseFloat(adjQty); if (isNaN(target) || target < 0) return;
+    const current = stocks[adjItem] || 0;
+    const diff = target - current;
+    if (diff === 0) { setModal(null); return; }
+    const adj = { id: gid(), itemId: adjItem, quantity: diff, note: adjNote.trim() || `Correction stock → ${target}`, timestamp: Date.now() };
     const u = { ...data, stockAdjustments: [...(data.stockAdjustments || []), adj] };
     setData(u); await saveData(u); setAdjQty(""); setAdjNote(""); setModal(null);
   };
@@ -428,7 +431,7 @@ function Admin({ data, setData }) {
       {tab === "stocks" && <div style={{ animation: "fadeIn .4s" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
           <Title icon="📦">Stocks</Title>
-          <button onClick={() => setModal("adjustStock")} style={btnP}>±  AJUSTER UN STOCK</button>
+          <button onClick={() => setModal("adjustStock")} style={btnP}>CORRIGER UN STOCK</button>
         </div>
         <Title icon="⛏️">Matières Premières</Title>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 16, marginBottom: 32 }}>
@@ -755,17 +758,17 @@ function Admin({ data, setData }) {
         </div>
       </Modal>
 
-      <Modal open={modal === "adjustStock"} onClose={() => setModal(null)} title="Ajuster un stock manuellement">
+      <Modal open={modal === "adjustStock"} onClose={() => setModal(null)} title="Corriger un stock">
         <div style={{ display: "grid", gap: 16 }}>
           <div>{lbl("Objet")}<select value={adjItem} onChange={e => setAdjItem(e.target.value)} style={sel}>{ALL_ITEMS.map(r => { const st = stocks[r.id] || 0; return <option key={r.id} value={r.id}>{r.icon} {r.name} (stock: {Math.floor(st)})</option>; })}</select></div>
           <div style={{ background: "rgba(0,0,0,.3)", padding: 14, borderRadius: 4, border: `1px solid ${C.border}` }}>
             <div style={{ color: C.muted, fontSize: 15 }}>Stock actuel de <strong style={{ color: C.goldLt }}>{ALL_ITEMS.find(x => x.id === adjItem)?.name}</strong> :</div>
             <div style={{ color: C.gold, fontSize: 28, fontFamily: "'Playfair Display',serif", fontWeight: 900, marginTop: 4 }}>{Math.floor(stocks[adjItem] || 0)}</div>
           </div>
-          <div>{lbl("Ajustement (+ pour ajouter, - pour retirer)")}<input type="number" value={adjQty} onChange={e => setAdjQty(e.target.value)} placeholder="Ex: 10 ou -5" style={inp} /></div>
-          {adjQty && <div style={{ color: C.muted, fontSize: 15 }}>Nouveau stock : <strong style={{ color: (Math.floor(stocks[adjItem] || 0) + (parseFloat(adjQty) || 0)) >= 0 ? C.greenLt : C.redLt, fontSize: 20 }}>{Math.floor(stocks[adjItem] || 0) + (parseFloat(adjQty) || 0)}</strong></div>}
-          <div>{lbl("Raison")}<input value={adjNote} onChange={e => setAdjNote(e.target.value)} placeholder="Ex: Correction inventaire, Achat pioches..." style={inp} /></div>
-          <button onClick={adjustStock} style={{ ...btnP, fontSize: 16, padding: "16px 32px" }}>APPLIQUER L'AJUSTEMENT</button>
+          <div>{lbl("Stock réel (le chiffre que vous constatez)")}<input type="number" value={adjQty} onChange={e => setAdjQty(e.target.value)} placeholder="Ex: 42" style={inp} min="0" step="1" /></div>
+          {adjQty !== "" && <div style={{ color: C.muted, fontSize: 15 }}>Différence appliquée : <strong style={{ color: ((parseFloat(adjQty) || 0) - Math.floor(stocks[adjItem] || 0)) >= 0 ? C.greenLt : C.redLt, fontSize: 20 }}>{((parseFloat(adjQty) || 0) - Math.floor(stocks[adjItem] || 0)) >= 0 ? "+" : ""}{(parseFloat(adjQty) || 0) - Math.floor(stocks[adjItem] || 0)}</strong></div>}
+          <div>{lbl("Raison (optionnel)")}<input value={adjNote} onChange={e => setAdjNote(e.target.value)} placeholder="Ex: Correction après inventaire" style={inp} /></div>
+          <button onClick={adjustStock} style={{ ...btnP, fontSize: 16, padding: "16px 32px" }}>CORRIGER LE STOCK</button>
         </div>
       </Modal>
     </div>
