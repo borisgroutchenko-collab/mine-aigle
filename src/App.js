@@ -13,7 +13,7 @@ const RAW_RESOURCES = [
 const CRAFTED_PRODUCTS = [
   { id: "lingot_fer", name: "Lingot de fer", unit: "unité", icon: "🟫", color: "#B87333" },
   { id: "lingot_acier", name: "Lingot d'acier", unit: "unité", icon: "🔘", color: "#8FA4B8" },
-  { id: "amas_soufre", name: "Amas de soufre", unit: "unité", icon: "💛", color: "#DAA520" },
+  { id: "amas_soufre", name: "Soufre", unit: "unité", icon: "💛", color: "#DAA520" },
   { id: "tete_outil", name: "Tête d'outil", unit: "unité", icon: "🔨", color: "#CD853F" },
   { id: "clous", name: "Clous", unit: "unité", icon: "📌", color: "#808080" },
   { id: "jarres", name: "Jarres vides", unit: "unité", icon: "🏺", color: "#C4A882" },
@@ -25,7 +25,7 @@ const ALL_ITEMS = [...RAW_RESOURCES, ...CRAFTED_PRODUCTS];
 const RECIPES = [
   { id: "craft_lingot_fer", inputs: [{ itemId: "minerai_fer", qty: 5 }], outputs: [{ itemId: "lingot_fer", qty: 1 }], description: "5 minerais de fer → 1 lingot de fer" },
   { id: "craft_lingot_acier", inputs: [{ itemId: "minerai_acier", qty: 5 }], outputs: [{ itemId: "lingot_acier", qty: 1 }], description: "5 minerais d'acier → 1 lingot d'acier" },
-  { id: "craft_amas_soufre", inputs: [{ itemId: "minerai_soufre", qty: 5 }], outputs: [{ itemId: "amas_soufre", qty: 1 }], description: "5 minerais de soufre → 1 amas de soufre" },
+  { id: "craft_amas_soufre", inputs: [{ itemId: "minerai_soufre", qty: 5 }], outputs: [{ itemId: "amas_soufre", qty: 1 }], description: "5 minerais de soufre → 1 soufre" },
   { id: "craft_tete_outil", inputs: [{ itemId: "lingot_acier", qty: 2 }], outputs: [{ itemId: "tete_outil", qty: 1 }], description: "2 lingots d'acier → 1 tête d'outil" },
   { id: "craft_clous", inputs: [{ itemId: "lingot_fer", qty: 5 }], outputs: [{ itemId: "clous", qty: 50 }], description: "5 lingots de fer → 50 clous" },
   { id: "craft_jarres", inputs: [{ itemId: "lingot_fer", qty: 2 }], outputs: [{ itemId: "jarres", qty: 20 }], description: "2 lingots de fer → 20 jarres vides" },
