@@ -294,6 +294,8 @@ function Admin({ data, setData }) {
   const [salaryNote, setSalaryNote] = useState("");
   const [editSaleId, setEditSaleId] = useState(null);
   const [editSaleQty, setEditSaleQty] = useState("");
+  const [editConId, setEditConId] = useState(null);
+  const [editCon, setEditCon] = useState({ buyer: "", resourceId: "", quantity: "", pricePerUnit: "", notes: "" });
   const [cf, setCf] = useState({ buyer: "", resourceId: ALL_ITEMS[0].id, quantity: "", pricePerUnit: "", notes: "" });
   const [sf, setSf] = useState({ contractId: "", quantity: "" });
   const [ef, setEf] = useState({ category: EXPENSE_CATEGORIES[0], amount: "", description: "" });
@@ -403,6 +405,13 @@ function Admin({ data, setData }) {
     const adj = { id: gid(), itemId: adjItem, quantity: diff, note: adjNote.trim() || `Correction stock → ${target}`, timestamp: Date.now() };
     const u = { ...data, stockAdjustments: [...(data.stockAdjustments || []), adj] };
     setData(u); await saveData(u); setAdjQty(""); setAdjNote(""); setModal(null);
+  };
+
+  const saveContract = async () => {
+    const q = parseFloat(editCon.quantity); const p = parseFloat(editCon.pricePerUnit);
+    if (!editCon.buyer.trim() || !q || !p) return;
+    const u = { ...data, contracts: data.contracts.map(c => c.id === editConId ? { ...c, buyer: editCon.buyer.trim(), resourceId: editCon.resourceId, totalQuantity: q, pricePerUnit: p, notes: editCon.notes.trim(), status: c.deliveredQuantity >= q ? "completed" : "active" } : c) };
+    setData(u); await saveData(u); setEditConId(null);
   };
 
   const totalRev = data.sales.reduce((s, x) => s + x.totalPrice, 0);
@@ -575,20 +584,47 @@ function Admin({ data, setData }) {
               const prog = c.totalQuantity > 0 ? (c.deliveredQuantity / c.totalQuantity * 100) : 0;
               const pi = PRICE_INFO[c.resourceId];
               const inRange = pi && !pi.libre && pi.min != null ? (c.pricePerUnit >= pi.min && c.pricePerUnit <= pi.max) : true;
+
+              if (editConId === c.id) {
+                const ecPi = PRICE_INFO[editCon.resourceId];
+                return <Card key={c.id} style={{ border: `2px solid ${C.accentLt}` }}><div style={{ padding: 24 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <span style={{ color: C.gold, fontWeight: 700, fontSize: 18, fontFamily: "'Playfair Display',serif" }}>✏️ Modifier le contrat</span>
+                    <span style={{ color: C.dark, fontSize: 13 }}>Livré : {c.deliveredQuantity}</span>
+                  </div>
+                  <div style={{ display: "grid", gap: 14 }}>
+                    <div>{lbl("Acheteur")}<input value={editCon.buyer} onChange={e => setEditCon({ ...editCon, buyer: e.target.value })} style={inp} /></div>
+                    <div>{lbl("Produit")}<select value={editCon.resourceId} onChange={e => setEditCon({ ...editCon, resourceId: e.target.value })} style={sel}>{sellable.map(r2 => <option key={r2.id} value={r2.id}>{r2.icon} {r2.name}</option>)}</select>
+                      <PriceReminder rid={editCon.resourceId} />
+                    </div>
+                    <div>{lbl("Quantité totale")}<input type="number" value={editCon.quantity} onChange={e => setEditCon({ ...editCon, quantity: e.target.value })} style={inp} min="0" /></div>
+                    <div>{lbl("Prix par unité ($)")}<input type="number" value={editCon.pricePerUnit} onChange={e => setEditCon({ ...editCon, pricePerUnit: e.target.value })} style={inp} min="0" step="0.01" /></div>
+                    <div>{lbl("Notes")}<input value={editCon.notes} onChange={e => setEditCon({ ...editCon, notes: e.target.value })} style={inp} /></div>
+                    {editCon.quantity && editCon.pricePerUnit && <div style={{ color: C.muted, fontSize: 15 }}>Nouveau total contrat : <strong style={{ color: C.gold, fontSize: 20 }}>${((parseFloat(editCon.quantity) || 0) * (parseFloat(editCon.pricePerUnit) || 0)).toFixed(2)}</strong></div>}
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button onClick={saveContract} style={{ ...btnP, flex: 1, padding: "12px 20px" }}>SAUVEGARDER</button>
+                      <button onClick={() => setEditConId(null)} style={{ ...btnS, flex: 1, padding: "12px 20px" }}>ANNULER</button>
+                    </div>
+                  </div>
+                </div></Card>;
+              }
+
               return <Card key={c.id}><div style={{ padding: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <span style={{ color: C.goldLt, fontWeight: 700, fontSize: 22, fontFamily: "'Playfair Display',serif" }}>{c.buyer}</span>
                     <span style={{ padding: "5px 14px", borderRadius: 3, fontSize: 14, fontWeight: 700, background: c.status === "completed" ? "rgba(90,143,74,.2)" : "rgba(201,168,76,.15)", color: c.status === "completed" ? C.greenLt : C.gold, border: `1px solid ${c.status === "completed" ? C.green : C.goldDk}` }}>{c.status === "completed" ? "✓ COMPLÉTÉ" : "EN COURS"}</span>
                   </div>
-                  <button onClick={() => rm("contracts", c.id)} style={{ ...btnD, padding: "4px 12px", fontSize: 13 }}>✕</button>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => { setEditConId(c.id); setEditCon({ buyer: c.buyer, resourceId: c.resourceId, quantity: String(c.totalQuantity), pricePerUnit: String(c.pricePerUnit), notes: c.notes || "" }); }} style={{ ...btnS, padding: "4px 10px", fontSize: 13, color: C.gold, borderColor: C.goldDk }}>✏️</button>
+                    <button onClick={() => rm("contracts", c.id)} style={{ ...btnD, padding: "4px 12px", fontSize: 13 }}>✕</button>
+                  </div>
                 </div>
                 <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
                   <span style={{ color: r?.color, fontSize: 20 }}>{r?.icon} {r?.name}</span>
                   <span style={{ color: C.goldLt, fontSize: 24, fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>{c.deliveredQuantity} / {c.totalQuantity}</span>
                   <span style={{ color: C.muted, fontSize: 17 }}>@ <strong style={{ color: inRange ? C.gold : C.redLt }}>${c.pricePerUnit.toFixed(2)}</strong> /unité</span>
                 </div>
-                {/* Price range reminder */}
                 <div style={{ marginTop: 12, background: "rgba(201,168,76,.06)", border: `1px solid ${C.border}`, borderRadius: 3, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <span style={{ color: C.dark, fontSize: 15 }}>💲 Fourchette :</span>
                   {pi?.libre ? <span style={{ color: C.gold, fontWeight: 600 }}>Prix libre</span> : pi?.min != null ? <span style={{ color: C.gold, fontWeight: 700, fontSize: 17 }}>${pi.min.toFixed(2)} – ${pi.max.toFixed(2)}</span> : <span style={{ color: C.dark }}>Non défini</span>}
