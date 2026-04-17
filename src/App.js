@@ -47,6 +47,20 @@ const PRICE_INFO = {
   divers: { min: null, max: null, export: false, libre: true },
 };
 
+const BBL_PRICES = {
+  charbon: 0.385,
+  amas_soufre: 0.485,
+  lingot_acier: 0.685,
+  lingot_fer: 0.635,
+};
+
+const SALARY_RATES = {
+  charbon: { rate: 0.485, label: "Charbon" },
+  minerai_fer: { rate: 0.127, label: "Minerai de fer" },
+  minerai_acier: { rate: 0.137, label: "Minerai d'acier" },
+  minerai_soufre: { rate: 0.097, label: "Minerai de soufre" },
+};
+
 const EXPENSE_CATEGORIES = ["Pioches & Outils","Dynamite & Explosifs","Bois de soutènement","Équipement de sécurité","Transport & Chariots","Salaires","Nourriture & Provisions","Matériel divers","Taxes"];
 
 const initState = () => ({ employees: [], productions: [], crafts: [], contracts: [], sales: [], expenses: [], stockAdjustments: [] });
@@ -235,6 +249,36 @@ function EmployeeView({ name, data, setData }) {
                 </div>
               )}
               {mySalaries.length === 0 && <p style={{ color: C.dark, fontStyle: "italic", fontSize: 15, marginTop: 8 }}>Aucun salaire versé pour le moment.</p>}
+            </div>
+          </Card>
+        );
+      })()}
+
+      {/* Salary calculator based on productions */}
+      {(() => {
+        const myTotals = {};
+        my.forEach(p => { if (SALARY_RATES[p.resourceId]) { myTotals[p.resourceId] = (myTotals[p.resourceId] || 0) + p.quantity; } });
+        const earnedTotal = Object.entries(myTotals).reduce((s, [id, qty]) => s + qty * SALARY_RATES[id].rate, 0);
+        return (
+          <Card style={{ marginTop: 24 }}>
+            <div style={{ padding: 22 }}>
+              <h3 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 800, margin: "0 0 12px" }}>🧮 Salaire estimé (basé sur mes extractions)</h3>
+              <Divider />
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                {Object.entries(SALARY_RATES).map(([id, info]) => {
+                  const qty = myTotals[id] || 0;
+                  const earned = qty * info.rate;
+                  const item = ALL_ITEMS.find(x => x.id === id);
+                  return <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "rgba(0,0,0,.2)", borderRadius: 4, border: `1px solid ${C.border}` }}>
+                    <div><span style={{ color: item?.color, fontWeight: 600, fontSize: 16 }}>{item?.icon} {info.label}</span><span style={{ color: C.muted, marginLeft: 10, fontSize: 14 }}>×{qty} @ ${info.rate.toFixed(3)}/u</span></div>
+                    <span style={{ color: earned > 0 ? C.greenLt : C.dark, fontWeight: 700, fontSize: 18 }}>${earned.toFixed(2)}</span>
+                  </div>;
+                })}
+              </div>
+              <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "rgba(201,168,76,.08)", borderRadius: 4, border: `2px solid ${C.goldDk}` }}>
+                <span style={{ color: C.gold, fontSize: 18, fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>Total estimé :</span>
+                <span style={{ color: C.greenLt, fontSize: 28, fontWeight: 900, fontFamily: "'Playfair Display',serif" }}>${earnedTotal.toFixed(2)}</span>
+              </div>
             </div>
           </Card>
         );
@@ -720,13 +764,27 @@ function Admin({ data, setData }) {
       {tab === "prices" && <div style={{ animation: "fadeIn .4s" }}>
         <Title icon="💲">Grille Tarifaire</Title>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {ALL_ITEMS.filter(i => PRICE_INFO[i.id]).map(item => { const i = PRICE_INFO[item.id]; return <Card key={item.id}><div style={{ padding: "20px 26px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          {ALL_ITEMS.filter(i => PRICE_INFO[i.id]).map(item => { const i = PRICE_INFO[item.id]; const bbl = BBL_PRICES[item.id]; return <Card key={item.id}><div style={{ padding: "20px 26px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}><span style={{ fontSize: 32 }}>{item.icon}</span><span style={{ color: item.color, fontWeight: 700, fontSize: 20, fontFamily: "'Playfair Display',serif" }}>{item.name}</span></div>
             <div style={{ textAlign: "right" }}>
               {i.libre ? <span style={{ color: C.muted, fontSize: 17, fontStyle: "italic" }}>Prix libre</span> : <span style={{ color: C.goldLt, fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700 }}>${i.min?.toFixed(2)} – ${i.max?.toFixed(2)}</span>}
-              {i.export && <div style={{ marginTop: 6 }}><span style={{ color: C.greenLt, fontSize: 14, fontWeight: 700, background: "rgba(90,143,74,.15)", padding: "4px 12px", borderRadius: 3, border: `1px solid ${C.green}` }}>Exportateur ✓</span></div>}
+              {bbl && <div style={{ marginTop: 4 }}><span style={{ color: "#C9A84C", fontSize: 14, fontWeight: 700, background: "rgba(201,168,76,.1)", padding: "3px 10px", borderRadius: 3, border: `1px solid ${C.goldDk}` }}>BBL : ${bbl.toFixed(3)}</span></div>}
+              {i.export && <div style={{ marginTop: 4 }}><span style={{ color: C.greenLt, fontSize: 14, fontWeight: 700, background: "rgba(90,143,74,.15)", padding: "4px 12px", borderRadius: 3, border: `1px solid ${C.green}` }}>Exportateur ✓</span></div>}
             </div>
           </div></Card>; })}
+        </div>
+
+        <div style={{ marginTop: 32 }}>
+          <Title icon="💰">Grille salariale (par unité extraite)</Title>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {Object.entries(SALARY_RATES).map(([id, info]) => {
+              const item = ALL_ITEMS.find(x => x.id === id);
+              return <Card key={id}><div style={{ padding: "20px 26px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}><span style={{ fontSize: 32 }}>{item?.icon}</span><span style={{ color: item?.color, fontWeight: 700, fontSize: 20, fontFamily: "'Playfair Display',serif" }}>{info.label}</span></div>
+                <span style={{ color: C.greenLt, fontFamily: "'Playfair Display',serif", fontSize: 24, fontWeight: 700 }}>${info.rate.toFixed(3)} /u</span>
+              </div></Card>;
+            })}
+          </div>
         </div>
       </div>}
 
