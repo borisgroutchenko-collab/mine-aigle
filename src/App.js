@@ -392,7 +392,7 @@ function Admin({ data, setData }) {
     const q = parseFloat(sf.quantity); if (!sf.contractId || !sf.itemId || !q || q <= 0) return;
     const con = data.contracts.find(c => c.id === sf.contractId); if (!con) return;
     const item = (con.items || []).find(i => i.id === sf.itemId); if (!item) return;
-    if ((stocks[item.resourceId] || 0) < q) { alert("Stock insuffisant !"); return; }
+    if (item.resourceId !== "divers" && (stocks[item.resourceId] || 0) < q) { alert("Stock insuffisant !"); return; }
     const rem = item.totalQuantity - item.deliveredQuantity; if (q > rem) { alert(`Reste ${rem} sur cette ligne`); return; }
     const sale = { id: gid(), contractId: con.id, itemLineId: item.id, resourceId: item.resourceId, quantity: q, pricePerUnit: item.pricePerUnit, totalPrice: q * item.pricePerUnit, buyer: con.buyer, timestamp: Date.now() };
     const updatedItems = con.items.map(i => i.id === item.id ? { ...i, deliveredQuantity: i.deliveredQuantity + q } : i);
