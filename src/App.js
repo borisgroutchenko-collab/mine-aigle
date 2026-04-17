@@ -18,6 +18,7 @@ const CRAFTED_PRODUCTS = [
   { id: "clous", name: "Clous", unit: "unité", icon: "📌", color: "#808080" },
   { id: "jarres", name: "Jarres vides", unit: "unité", icon: "🏺", color: "#C4A882" },
   { id: "pioches", name: "Pioches", unit: "unité", icon: "⛏️", color: "#8B6914" },
+  { id: "divers", name: "Produits divers", unit: "unité", icon: "📦", color: "#A0896B" },
 ];
 
 const ALL_ITEMS = [...RAW_RESOURCES, ...CRAFTED_PRODUCTS];
@@ -43,6 +44,7 @@ const PRICE_INFO = {
   pioches: { min: null, max: null, export: false, libre: true },
   minerai_fer: { min: null, max: null, export: false, libre: true },
   minerai_acier: { min: null, max: null, export: false, libre: true },
+  divers: { min: null, max: null, export: false, libre: true },
 };
 
 const EXPENSE_CATEGORIES = ["Pioches & Outils","Dynamite & Explosifs","Bois de soutènement","Équipement de sécurité","Transport & Chariots","Salaires","Nourriture & Provisions","Matériel divers","Taxes"];
@@ -295,9 +297,9 @@ function Admin({ data, setData }) {
   const [editSaleId, setEditSaleId] = useState(null);
   const [editSaleQty, setEditSaleQty] = useState("");
   const [editConId, setEditConId] = useState(null);
-  const [editCon, setEditCon] = useState({ buyer: "", resourceId: "", quantity: "", pricePerUnit: "", notes: "" });
-  const [cf, setCf] = useState({ buyer: "", resourceId: ALL_ITEMS[0].id, quantity: "", pricePerUnit: "", notes: "" });
-  const [sf, setSf] = useState({ contractId: "", quantity: "" });
+  const [editCon, setEditCon] = useState({ buyer: "", items: [], notes: "" });
+  const [cf, setCf] = useState({ buyer: "", items: [{ resourceId: "minerai_soufre", quantity: "", pricePerUnit: "" }], notes: "" });
+  const [sf, setSf] = useState({ contractId: "", itemId: "", quantity: "" });
   const [ef, setEf] = useState({ category: EXPENSE_CATEGORIES[0], amount: "", description: "" });
   const [pf, setPf] = useState({ employeeName: "", resourceId: RAW_RESOURCES[0].id, quantity: "", note: "" });
   const [cr, setCr] = useState(RECIPES[0].id);
@@ -359,8 +361,15 @@ function Admin({ data, setData }) {
     const updatedSales = data.sales.map(s => s.id === saleId ? { ...s, quantity: newQty, totalPrice: newQty * s.pricePerUnit } : s);
     const updatedContracts = data.contracts.map(c => {
       if (c.id === sale.contractId) {
-        const newDelivered = c.deliveredQuantity + diff;
-        return { ...c, deliveredQuantity: newDelivered, status: newDelivered >= c.totalQuantity ? "completed" : "active" };
+        // Multi-item: update the specific item line
+        if (c.items) {
+          const updItems = c.items.map(i => i.id === sale.itemLineId ? { ...i, deliveredQuantity: (i.deliveredQuantity || 0) + diff } : i);
+          const allDone = updItems.every(i => (i.deliveredQuantity || 0) >= i.totalQuantity);
+          return { ...c, items: updItems, status: allDone ? "completed" : "active" };
+        }
+        // Legacy single-item fallback
+        const newDel = (c.deliveredQuantity || 0) + diff;
+        return { ...c, deliveredQuantity: newDel, status: newDel >= c.totalQuantity ? "completed" : "active" };
       }
       return c;
     });
@@ -369,20 +378,27 @@ function Admin({ data, setData }) {
   };
 
   const addContract = async () => {
-    const q = parseFloat(cf.quantity), p = parseFloat(cf.pricePerUnit);
-    if (!cf.buyer.trim() || !q || !p) return;
-    const u = { ...data, contracts: [...data.contracts, { id: gid(), buyer: cf.buyer.trim(), resourceId: cf.resourceId, totalQuantity: q, deliveredQuantity: 0, pricePerUnit: p, notes: cf.notes.trim(), status: "active", createdAt: Date.now() }] };
-    setData(u); await saveData(u); setCf({ buyer: "", resourceId: ALL_ITEMS[0].id, quantity: "", pricePerUnit: "", notes: "" }); setModal(null);
+    if (!cf.buyer.trim()) return;
+    const items = cf.items.filter(i => parseFloat(i.quantity) > 0 && parseFloat(i.pricePerUnit) > 0).map(i => ({
+      id: gid(), resourceId: i.resourceId, totalQuantity: parseFloat(i.quantity), deliveredQuantity: 0, pricePerUnit: parseFloat(i.pricePerUnit)
+    }));
+    if (items.length === 0) return;
+    const contract = { id: gid(), buyer: cf.buyer.trim(), items, notes: cf.notes.trim(), status: "active", createdAt: Date.now() };
+    const u = { ...data, contracts: [...data.contracts, contract] };
+    setData(u); await saveData(u); setCf({ buyer: "", items: [{ resourceId: "minerai_soufre", quantity: "", pricePerUnit: "" }], notes: "" }); setModal(null);
   };
 
   const doSale = async () => {
-    const q = parseFloat(sf.quantity); if (!sf.contractId || !q || q <= 0) return;
+    const q = parseFloat(sf.quantity); if (!sf.contractId || !sf.itemId || !q || q <= 0) return;
     const con = data.contracts.find(c => c.id === sf.contractId); if (!con) return;
-    if ((stocks[con.resourceId] || 0) < q) { alert("Stock insuffisant !"); return; }
-    const rem = con.totalQuantity - con.deliveredQuantity; if (q > rem) { alert(`Reste ${rem} sur ce contrat`); return; }
-    const sale = { id: gid(), contractId: con.id, resourceId: con.resourceId, quantity: q, pricePerUnit: con.pricePerUnit, totalPrice: q * con.pricePerUnit, buyer: con.buyer, timestamp: Date.now() };
-    const uc = data.contracts.map(c => c.id === con.id ? { ...c, deliveredQuantity: c.deliveredQuantity + q, status: (c.deliveredQuantity + q >= c.totalQuantity) ? "completed" : "active" } : c);
-    const u = { ...data, sales: [...data.sales, sale], contracts: uc }; setData(u); await saveData(u); setSf({ contractId: "", quantity: "" }); setModal(null);
+    const item = (con.items || []).find(i => i.id === sf.itemId); if (!item) return;
+    if ((stocks[item.resourceId] || 0) < q) { alert("Stock insuffisant !"); return; }
+    const rem = item.totalQuantity - item.deliveredQuantity; if (q > rem) { alert(`Reste ${rem} sur cette ligne`); return; }
+    const sale = { id: gid(), contractId: con.id, itemLineId: item.id, resourceId: item.resourceId, quantity: q, pricePerUnit: item.pricePerUnit, totalPrice: q * item.pricePerUnit, buyer: con.buyer, timestamp: Date.now() };
+    const updatedItems = con.items.map(i => i.id === item.id ? { ...i, deliveredQuantity: i.deliveredQuantity + q } : i);
+    const allDone = updatedItems.every(i => i.deliveredQuantity >= i.totalQuantity);
+    const uc = data.contracts.map(c => c.id === con.id ? { ...c, items: updatedItems, status: allDone ? "completed" : "active" } : c);
+    const u = { ...data, sales: [...data.sales, sale], contracts: uc }; setData(u); await saveData(u); setSf({ contractId: "", itemId: "", quantity: "" }); setModal(null);
   };
 
   const addExp = async () => { const a = parseFloat(ef.amount); if (!a || !ef.description.trim()) return; const u = { ...data, expenses: [...data.expenses, { id: gid(), category: ef.category, amount: a, description: ef.description.trim(), timestamp: Date.now() }] }; setData(u); await saveData(u); setEf({ category: EXPENSE_CATEGORIES[0], amount: "", description: "" }); setModal(null); };
@@ -408,9 +424,13 @@ function Admin({ data, setData }) {
   };
 
   const saveContract = async () => {
-    const q = parseFloat(editCon.quantity); const p = parseFloat(editCon.pricePerUnit);
-    if (!editCon.buyer.trim() || !q || !p) return;
-    const u = { ...data, contracts: data.contracts.map(c => c.id === editConId ? { ...c, buyer: editCon.buyer.trim(), resourceId: editCon.resourceId, totalQuantity: q, pricePerUnit: p, notes: editCon.notes.trim(), status: c.deliveredQuantity >= q ? "completed" : "active" } : c) };
+    if (!editCon.buyer.trim()) return;
+    const items = editCon.items.filter(i => parseFloat(i.totalQuantity) > 0 && parseFloat(i.pricePerUnit) > 0).map(i => ({
+      ...i, totalQuantity: parseFloat(i.totalQuantity), pricePerUnit: parseFloat(i.pricePerUnit), deliveredQuantity: i.deliveredQuantity || 0
+    }));
+    if (items.length === 0) return;
+    const allDone = items.every(i => i.deliveredQuantity >= i.totalQuantity);
+    const u = { ...data, contracts: data.contracts.map(c => c.id === editConId ? { ...c, buyer: editCon.buyer.trim(), items, notes: editCon.notes.trim(), status: allDone ? "completed" : "active" } : c) };
     setData(u); await saveData(u); setEditConId(null);
   };
 
@@ -580,31 +600,42 @@ function Admin({ data, setData }) {
         {data.contracts.length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucun contrat.</p>
           : <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {[...data.contracts].sort((a, b) => b.createdAt - a.createdAt).map(c => {
-              const r = ALL_ITEMS.find(x => x.id === c.resourceId);
-              const prog = c.totalQuantity > 0 ? (c.deliveredQuantity / c.totalQuantity * 100) : 0;
-              const pi = PRICE_INFO[c.resourceId];
-              const inRange = pi && !pi.libre && pi.min != null ? (c.pricePerUnit >= pi.min && c.pricePerUnit <= pi.max) : true;
+              // Support both legacy single-item and new multi-item contracts
+              const items = c.items || [{ id: c.id + "_legacy", resourceId: c.resourceId, totalQuantity: c.totalQuantity, deliveredQuantity: c.deliveredQuantity || 0, pricePerUnit: c.pricePerUnit }];
+              const totalVal = items.reduce((s, i) => s + i.totalQuantity * i.pricePerUnit, 0);
+              const totalDeliveredVal = items.reduce((s, i) => s + (i.deliveredQuantity || 0) * i.pricePerUnit, 0);
+              const allDone = items.every(i => (i.deliveredQuantity || 0) >= i.totalQuantity);
+              const anyStarted = items.some(i => (i.deliveredQuantity || 0) > 0);
 
               if (editConId === c.id) {
-                const ecPi = PRICE_INFO[editCon.resourceId];
                 return <Card key={c.id} style={{ border: `2px solid ${C.accentLt}` }}><div style={{ padding: 24 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                     <span style={{ color: C.gold, fontWeight: 700, fontSize: 18, fontFamily: "'Playfair Display',serif" }}>✏️ Modifier le contrat</span>
-                    <span style={{ color: C.dark, fontSize: 13 }}>Livré : {c.deliveredQuantity}</span>
+                    <button onClick={() => setEditConId(null)} style={{ ...btnS, padding: "6px 14px", fontSize: 13 }}>ANNULER</button>
                   </div>
                   <div style={{ display: "grid", gap: 14 }}>
                     <div>{lbl("Acheteur")}<input value={editCon.buyer} onChange={e => setEditCon({ ...editCon, buyer: e.target.value })} style={inp} /></div>
-                    <div>{lbl("Produit")}<select value={editCon.resourceId} onChange={e => setEditCon({ ...editCon, resourceId: e.target.value })} style={sel}>{sellable.map(r2 => <option key={r2.id} value={r2.id}>{r2.icon} {r2.name}</option>)}</select>
-                      <PriceReminder rid={editCon.resourceId} />
-                    </div>
-                    <div>{lbl("Quantité totale")}<input type="number" value={editCon.quantity} onChange={e => setEditCon({ ...editCon, quantity: e.target.value })} style={inp} min="0" /></div>
-                    <div>{lbl("Prix par unité ($)")}<input type="number" value={editCon.pricePerUnit} onChange={e => setEditCon({ ...editCon, pricePerUnit: e.target.value })} style={inp} min="0" step="0.01" /></div>
+                    <div>{lbl("Produits du contrat")}</div>
+                    {editCon.items.map((item, idx) => {
+                      const ecPi = PRICE_INFO[item.resourceId];
+                      return <div key={idx} style={{ background: "rgba(0,0,0,.2)", padding: 14, borderRadius: 4, border: `1px solid ${C.border}` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                          <span style={{ color: C.muted, fontSize: 14 }}>Produit {idx + 1}</span>
+                          {editCon.items.length > 1 && <button onClick={() => setEditCon({ ...editCon, items: editCon.items.filter((_, j) => j !== idx) })} style={{ ...btnD, padding: "2px 8px", fontSize: 11 }}>✕</button>}
+                        </div>
+                        <div style={{ display: "grid", gap: 8 }}>
+                          <select value={item.resourceId} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], resourceId: e.target.value }; setEditCon({ ...editCon, items: ni }); }} style={sel}>{sellable.map(r2 => <option key={r2.id} value={r2.id}>{r2.icon} {r2.name}</option>)}</select>
+                          {ecPi && !ecPi.libre && ecPi.min != null && <span style={{ color: C.goldDk, fontSize: 13 }}>💲 {ecPi.min.toFixed(2)} – {ecPi.max.toFixed(2)} $</span>}
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <input type="number" value={item.totalQuantity} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], totalQuantity: e.target.value }; setEditCon({ ...editCon, items: ni }); }} placeholder="Qté" style={{ ...inp, flex: 1 }} min="0" />
+                            <input type="number" value={item.pricePerUnit} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], pricePerUnit: e.target.value }; setEditCon({ ...editCon, items: ni }); }} placeholder="Prix/u" style={{ ...inp, flex: 1 }} min="0" step="0.01" />
+                          </div>
+                        </div>
+                      </div>;
+                    })}
+                    <button onClick={() => setEditCon({ ...editCon, items: [...editCon.items, { id: gid(), resourceId: sellable[0]?.id || "minerai_soufre", totalQuantity: "", pricePerUnit: "", deliveredQuantity: 0 }] })} style={{ ...btnS, padding: "10px 16px" }}>+ Ajouter un produit</button>
                     <div>{lbl("Notes")}<input value={editCon.notes} onChange={e => setEditCon({ ...editCon, notes: e.target.value })} style={inp} /></div>
-                    {editCon.quantity && editCon.pricePerUnit && <div style={{ color: C.muted, fontSize: 15 }}>Nouveau total contrat : <strong style={{ color: C.gold, fontSize: 20 }}>${((parseFloat(editCon.quantity) || 0) * (parseFloat(editCon.pricePerUnit) || 0)).toFixed(2)}</strong></div>}
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button onClick={saveContract} style={{ ...btnP, flex: 1, padding: "12px 20px" }}>SAUVEGARDER</button>
-                      <button onClick={() => setEditConId(null)} style={{ ...btnS, flex: 1, padding: "12px 20px" }}>ANNULER</button>
-                    </div>
+                    <button onClick={saveContract} style={{ ...btnP, padding: "14px 24px" }}>SAUVEGARDER</button>
                   </div>
                 </div></Card>;
               }
@@ -613,31 +644,37 @@ function Admin({ data, setData }) {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <span style={{ color: C.goldLt, fontWeight: 700, fontSize: 22, fontFamily: "'Playfair Display',serif" }}>{c.buyer}</span>
-                    <span style={{ padding: "5px 14px", borderRadius: 3, fontSize: 14, fontWeight: 700, background: c.status === "completed" ? "rgba(90,143,74,.2)" : "rgba(201,168,76,.15)", color: c.status === "completed" ? C.greenLt : C.gold, border: `1px solid ${c.status === "completed" ? C.green : C.goldDk}` }}>{c.status === "completed" ? "✓ COMPLÉTÉ" : "EN COURS"}</span>
+                    <span style={{ padding: "5px 14px", borderRadius: 3, fontSize: 14, fontWeight: 700, background: allDone ? "rgba(90,143,74,.2)" : "rgba(201,168,76,.15)", color: allDone ? C.greenLt : C.gold, border: `1px solid ${allDone ? C.green : C.goldDk}` }}>{allDone ? "✓ COMPLÉTÉ" : anyStarted ? "EN COURS" : "EN ATTENTE"}</span>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => { setEditConId(c.id); setEditCon({ buyer: c.buyer, resourceId: c.resourceId, quantity: String(c.totalQuantity), pricePerUnit: String(c.pricePerUnit), notes: c.notes || "" }); }} style={{ ...btnS, padding: "4px 10px", fontSize: 13, color: C.gold, borderColor: C.goldDk }}>✏️</button>
+                    <button onClick={() => { setEditConId(c.id); setEditCon({ buyer: c.buyer, items: items.map(i => ({ ...i, totalQuantity: String(i.totalQuantity), pricePerUnit: String(i.pricePerUnit) })), notes: c.notes || "" }); }} style={{ ...btnS, padding: "4px 10px", fontSize: 13, color: C.gold, borderColor: C.goldDk }}>✏️</button>
                     <button onClick={() => rm("contracts", c.id)} style={{ ...btnD, padding: "4px 12px", fontSize: 13 }}>✕</button>
                   </div>
                 </div>
-                <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                  <span style={{ color: r?.color, fontSize: 20 }}>{r?.icon} {r?.name}</span>
-                  <span style={{ color: C.goldLt, fontSize: 24, fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>{c.deliveredQuantity} / {c.totalQuantity}</span>
-                  <span style={{ color: C.muted, fontSize: 17 }}>@ <strong style={{ color: inRange ? C.gold : C.redLt }}>${c.pricePerUnit.toFixed(2)}</strong> /unité</span>
-                </div>
-                <div style={{ marginTop: 12, background: "rgba(201,168,76,.06)", border: `1px solid ${C.border}`, borderRadius: 3, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <span style={{ color: C.dark, fontSize: 15 }}>💲 Fourchette :</span>
-                  {pi?.libre ? <span style={{ color: C.gold, fontWeight: 600 }}>Prix libre</span> : pi?.min != null ? <span style={{ color: C.gold, fontWeight: 700, fontSize: 17 }}>${pi.min.toFixed(2)} – ${pi.max.toFixed(2)}</span> : <span style={{ color: C.dark }}>Non défini</span>}
-                  {pi?.export && <span style={{ color: C.greenLt, fontSize: 13, fontWeight: 700 }}>EXPORT</span>}
-                  {!inRange && <span style={{ color: C.redLt, fontSize: 14, fontWeight: 700 }}>⚠ Hors fourchette</span>}
+                {/* Product lines */}
+                <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                  {items.map(item => {
+                    const ir = ALL_ITEMS.find(x => x.id === item.resourceId);
+                    const iPi = PRICE_INFO[item.resourceId];
+                    const iRange = iPi && !iPi.libre && iPi.min != null ? (item.pricePerUnit >= iPi.min && item.pricePerUnit <= iPi.max) : true;
+                    const iProg = item.totalQuantity > 0 ? ((item.deliveredQuantity || 0) / item.totalQuantity * 100) : 0;
+                    return <div key={item.id} style={{ background: "rgba(0,0,0,.15)", padding: "12px 16px", borderRadius: 4, border: `1px solid ${C.border}` }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                        <span style={{ color: ir?.color, fontSize: 18 }}>{ir?.icon} {ir?.name}</span>
+                        <span style={{ color: C.goldLt, fontSize: 20, fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>{item.deliveredQuantity || 0} / {item.totalQuantity}</span>
+                        <span style={{ color: C.muted, fontSize: 15 }}>@ <strong style={{ color: iRange ? C.gold : C.redLt }}>${item.pricePerUnit.toFixed ? item.pricePerUnit.toFixed(2) : item.pricePerUnit}</strong> /u</span>
+                        <span style={{ color: C.gold, fontSize: 14 }}>= ${(item.totalQuantity * item.pricePerUnit).toFixed(2)}</span>
+                      </div>
+                      <div style={{ marginTop: 8, background: "rgba(0,0,0,.3)", borderRadius: 4, height: 10, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 3, width: `${iProg}%`, background: iProg >= 100 ? `linear-gradient(90deg,${C.green},${C.greenLt})` : `linear-gradient(90deg,${C.accent},${C.accentLt})` }} />
+                      </div>
+                    </div>;
+                  })}
                 </div>
                 {c.notes && <div style={{ color: C.dark, fontSize: 15, marginTop: 10, fontStyle: "italic" }}>"{c.notes}"</div>}
-                <div style={{ marginTop: 14, background: "rgba(0,0,0,.3)", borderRadius: 4, height: 14, overflow: "hidden", border: `1px solid ${C.border}` }}>
-                  <div style={{ height: "100%", borderRadius: 3, width: `${prog}%`, background: c.status === "completed" ? `linear-gradient(90deg,${C.green},${C.greenLt})` : `linear-gradient(90deg,${C.accent},${C.accentLt})` }} />
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 16 }}>
-                  <span style={{ color: C.dark }}>Livré : <strong style={{ color: C.greenLt }}>${(c.deliveredQuantity * c.pricePerUnit).toFixed(2)}</strong></span>
-                  <span style={{ color: C.dark }}>Total : <strong style={{ color: C.gold }}>${(c.totalQuantity * c.pricePerUnit).toFixed(2)}</strong></span>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, fontSize: 16 }}>
+                  <span style={{ color: C.dark }}>Livré : <strong style={{ color: C.greenLt }}>${totalDeliveredVal.toFixed(2)}</strong></span>
+                  <span style={{ color: C.dark }}>Total : <strong style={{ color: C.gold }}>${totalVal.toFixed(2)}</strong></span>
                 </div>
               </div></Card>;
             })}
@@ -750,7 +787,15 @@ function Admin({ data, setData }) {
         <h4 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, margin: "0 0 14px" }}>Contrats actifs</h4>
         {data.contracts.filter(c => c.status === "active").length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucun.</p>
           : <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
-            {data.contracts.filter(c => c.status === "active").map(c => { const r = ALL_ITEMS.find(x => x.id === c.resourceId); const rem = c.totalQuantity - c.deliveredQuantity; return <Row key={c.id}><div style={{ fontSize: 18 }}><span style={{ color: C.goldLt, fontWeight: 700 }}>{c.buyer}</span><span style={{ color: C.muted, marginLeft: 14 }}>reste {rem} {r?.name}</span><span style={{ color: C.greenLt, marginLeft: 14, fontWeight: 700 }}>(${(rem * c.pricePerUnit).toFixed(2)})</span></div></Row>; })}
+            {data.contracts.filter(c => c.status === "active").map(c => {
+              const items = c.items || [{ resourceId: c.resourceId, totalQuantity: c.totalQuantity, deliveredQuantity: c.deliveredQuantity || 0, pricePerUnit: c.pricePerUnit }];
+              const remVal = items.reduce((s, i) => s + (i.totalQuantity - (i.deliveredQuantity || 0)) * i.pricePerUnit, 0);
+              return <Row key={c.id}><div style={{ fontSize: 17 }}>
+                <span style={{ color: C.goldLt, fontWeight: 700 }}>{c.buyer}</span>
+                <span style={{ color: C.muted, marginLeft: 14 }}>{items.map(i => { const ir = ALL_ITEMS.find(x => x.id === i.resourceId); return `${i.totalQuantity - (i.deliveredQuantity || 0)} ${ir?.name || "?"}`; }).join(", ")}</span>
+                <span style={{ color: C.greenLt, marginLeft: 14, fontWeight: 700 }}>(${remVal.toFixed(2)} restant)</span>
+              </div></Row>;
+            })}
           </div>}
       </div>}
 
@@ -758,9 +803,25 @@ function Admin({ data, setData }) {
       <Modal open={modal === "addContract"} onClose={() => setModal(null)} title="Nouveau Contrat">
         <div style={{ display: "grid", gap: 16 }}>
           <div>{lbl("Acheteur")}<input value={cf.buyer} onChange={e => setCf({ ...cf, buyer: e.target.value })} placeholder="Nom" style={inp} /></div>
-          <div>{lbl("Produit")}<select value={cf.resourceId} onChange={e => setCf({ ...cf, resourceId: e.target.value })} style={sel}>{sellable.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}</select><PriceReminder rid={cf.resourceId} /></div>
-          <div>{lbl("Quantité")}<input type="number" value={cf.quantity} onChange={e => setCf({ ...cf, quantity: e.target.value })} placeholder="Ex: 50" style={inp} min="0" /></div>
-          <div>{lbl("Prix par unité ($)")}<input type="number" value={cf.pricePerUnit} onChange={e => setCf({ ...cf, pricePerUnit: e.target.value })} placeholder="Ex: 1.50" style={inp} min="0" step="0.01" /></div>
+          <div>{lbl("Produits")}</div>
+          {cf.items.map((item, idx) => {
+            const cfPi = PRICE_INFO[item.resourceId];
+            return <div key={idx} style={{ background: "rgba(0,0,0,.2)", padding: 14, borderRadius: 4, border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ color: C.muted, fontSize: 14 }}>Produit {idx + 1}</span>
+                {cf.items.length > 1 && <button onClick={() => setCf({ ...cf, items: cf.items.filter((_, j) => j !== idx) })} style={{ ...btnD, padding: "2px 8px", fontSize: 11 }}>✕</button>}
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                <select value={item.resourceId} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], resourceId: e.target.value }; setCf({ ...cf, items: ni }); }} style={sel}>{sellable.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}</select>
+                {cfPi && !cfPi.libre && cfPi.min != null && <span style={{ color: C.goldDk, fontSize: 13 }}>💲 Fourchette : {cfPi.min.toFixed(2)} – {cfPi.max.toFixed(2)} ${cfPi.export ? " (Export)" : ""}</span>}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input type="number" value={item.quantity} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], quantity: e.target.value }; setCf({ ...cf, items: ni }); }} placeholder="Quantité" style={{ ...inp, flex: 1 }} min="0" />
+                  <input type="number" value={item.pricePerUnit} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], pricePerUnit: e.target.value }; setCf({ ...cf, items: ni }); }} placeholder="Prix/unité ($)" style={{ ...inp, flex: 1 }} min="0" step="0.01" />
+                </div>
+              </div>
+            </div>;
+          })}
+          <button onClick={() => setCf({ ...cf, items: [...cf.items, { resourceId: sellable[0]?.id || "minerai_soufre", quantity: "", pricePerUnit: "" }] })} style={{ ...btnS, padding: "10px 16px" }}>+ Ajouter un produit</button>
           <div>{lbl("Notes")}<input value={cf.notes} onChange={e => setCf({ ...cf, notes: e.target.value })} placeholder="Détails" style={inp} /></div>
           <button onClick={addContract} style={{ ...btnP, fontSize: 16, padding: "16px 32px" }}>CRÉER LE CONTRAT</button>
         </div>
@@ -768,9 +829,30 @@ function Admin({ data, setData }) {
 
       <Modal open={modal === "addSale"} onClose={() => setModal(null)} title="Enregistrer une Vente">
         <div style={{ display: "grid", gap: 16 }}>
-          <div>{lbl("Contrat")}<select value={sf.contractId} onChange={e => setSf({ ...sf, contractId: e.target.value })} style={sel}><option value="">— Sélectionner —</option>{data.contracts.filter(c => c.status === "active").map(c => { const r = ALL_ITEMS.find(x => x.id === c.resourceId); return <option key={c.id} value={c.id}>{c.buyer} — {r?.name} (reste {c.totalQuantity - c.deliveredQuantity})</option>; })}</select></div>
-          <div>{lbl("Quantité livrée")}<input type="number" value={sf.quantity} onChange={e => setSf({ ...sf, quantity: e.target.value })} placeholder="Quantité" style={inp} min="0" step="1" /></div>
-          {sf.contractId && (() => { const c = data.contracts.find(x => x.id === sf.contractId); const r = ALL_ITEMS.find(x => x.id === c?.resourceId); const q = parseFloat(sf.quantity) || 0; return c ? <div style={{ background: "rgba(0,0,0,.3)", padding: 18, borderRadius: 4, border: `1px solid ${C.border}` }}><div style={{ color: C.muted, fontSize: 16, marginBottom: 6 }}>Stock : <strong style={{ color: C.goldLt }}>{Math.floor(stocks[c.resourceId] || 0)} {r?.name}</strong></div><div style={{ color: C.muted, fontSize: 16 }}>Montant : <strong style={{ color: C.greenLt, fontSize: 22 }}>${(q * c.pricePerUnit).toFixed(2)}</strong></div></div> : null; })()}
+          <div>{lbl("Contrat")}<select value={sf.contractId} onChange={e => setSf({ ...sf, contractId: e.target.value, itemId: "" })} style={sel}><option value="">— Sélectionner un contrat —</option>{data.contracts.filter(c => c.status === "active").map(c => <option key={c.id} value={c.id}>{c.buyer} ({(c.items || []).length} produit{(c.items || []).length > 1 ? "s" : ""})</option>)}</select></div>
+          {sf.contractId && (() => {
+            const con = data.contracts.find(x => x.id === sf.contractId);
+            if (!con) return null;
+            const items = con.items || [{ id: con.id + "_legacy", resourceId: con.resourceId, totalQuantity: con.totalQuantity, deliveredQuantity: con.deliveredQuantity || 0, pricePerUnit: con.pricePerUnit }];
+            const activeItems = items.filter(i => (i.deliveredQuantity || 0) < i.totalQuantity);
+            return <>
+              <div>{lbl("Produit")}<select value={sf.itemId} onChange={e => setSf({ ...sf, itemId: e.target.value })} style={sel}><option value="">— Sélectionner un produit —</option>{activeItems.map(i => { const ir = ALL_ITEMS.find(x => x.id === i.resourceId); return <option key={i.id} value={i.id}>{ir?.icon} {ir?.name} (reste {i.totalQuantity - (i.deliveredQuantity || 0)})</option>; })}</select></div>
+              {sf.itemId && (() => {
+                const item = items.find(i => i.id === sf.itemId);
+                if (!item) return null;
+                const ir = ALL_ITEMS.find(x => x.id === item.resourceId);
+                const q = parseFloat(sf.quantity) || 0;
+                return <>
+                  <div style={{ background: "rgba(0,0,0,.3)", padding: 14, borderRadius: 4, border: `1px solid ${C.border}` }}>
+                    <div style={{ color: C.muted, fontSize: 15, marginBottom: 4 }}>Stock : <strong style={{ color: C.goldLt }}>{Math.floor(stocks[item.resourceId] || 0)} {ir?.name}</strong></div>
+                    <div style={{ color: C.muted, fontSize: 15 }}>Reste à livrer : <strong style={{ color: C.gold }}>{item.totalQuantity - (item.deliveredQuantity || 0)}</strong> @ ${item.pricePerUnit}/u</div>
+                  </div>
+                  <div>{lbl("Quantité livrée")}<input type="number" value={sf.quantity} onChange={e => setSf({ ...sf, quantity: e.target.value })} placeholder="Quantité" style={inp} min="0" step="1" /></div>
+                  {q > 0 && <div style={{ color: C.muted, fontSize: 15 }}>Montant : <strong style={{ color: C.greenLt, fontSize: 22 }}>${(q * item.pricePerUnit).toFixed(2)}</strong></div>}
+                </>;
+              })()}
+            </>;
+          })()}
           <button onClick={doSale} style={{ ...btnP, fontSize: 16, padding: "16px 32px" }}>ENREGISTRER</button>
         </div>
       </Modal>
