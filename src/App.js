@@ -61,6 +61,15 @@ const SALARY_RATES = {
   minerai_soufre: { rate: 0.097, label: "Minerai de soufre" },
 };
 
+const WORK_CONTRACT = {
+  pay: 150,
+  duration: "1 heure / jour",
+  requirements: [
+    { resourceId: "minerai_fer", minQty: 2500, label: "Minerai de fer" },
+    { resourceId: "minerai_acier", minQty: 2500, label: "Minerai d'acier" },
+  ],
+};
+
 const EXPENSE_CATEGORIES = ["Pioches & Outils","Dynamite & Explosifs","Bois de soutènement","Équipement de sécurité","Transport & Chariots","Salaires","Nourriture & Provisions","Matériel divers","Taxes"];
 
 const initState = () => ({ employees: [], productions: [], crafts: [], contracts: [], sales: [], expenses: [], stockAdjustments: [] });
@@ -254,36 +263,6 @@ function EmployeeView({ name, data, setData }) {
         );
       })()}
 
-      {/* Salary calculator based on productions */}
-      {(() => {
-        const myTotals = {};
-        my.forEach(p => { if (SALARY_RATES[p.resourceId]) { myTotals[p.resourceId] = (myTotals[p.resourceId] || 0) + p.quantity; } });
-        const earnedTotal = Object.entries(myTotals).reduce((s, [id, qty]) => s + qty * SALARY_RATES[id].rate, 0);
-        return (
-          <Card style={{ marginTop: 24 }}>
-            <div style={{ padding: 22 }}>
-              <h3 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 800, margin: "0 0 12px" }}>🧮 Salaire estimé (basé sur mes extractions)</h3>
-              <Divider />
-              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                {Object.entries(SALARY_RATES).map(([id, info]) => {
-                  const qty = myTotals[id] || 0;
-                  const earned = qty * info.rate;
-                  const item = ALL_ITEMS.find(x => x.id === id);
-                  return <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "rgba(0,0,0,.2)", borderRadius: 4, border: `1px solid ${C.border}` }}>
-                    <div><span style={{ color: item?.color, fontWeight: 600, fontSize: 16 }}>{item?.icon} {info.label}</span><span style={{ color: C.muted, marginLeft: 10, fontSize: 14 }}>×{qty} @ ${info.rate.toFixed(3)}/u</span></div>
-                    <span style={{ color: earned > 0 ? C.greenLt : C.dark, fontWeight: 700, fontSize: 18 }}>${earned.toFixed(2)}</span>
-                  </div>;
-                })}
-              </div>
-              <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "rgba(201,168,76,.08)", borderRadius: 4, border: `2px solid ${C.goldDk}` }}>
-                <span style={{ color: C.gold, fontSize: 18, fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>Total estimé :</span>
-                <span style={{ color: C.greenLt, fontSize: 28, fontWeight: 900, fontFamily: "'Playfair Display',serif" }}>${earnedTotal.toFixed(2)}</span>
-              </div>
-            </div>
-          </Card>
-        );
-      })()}
-
       <div style={{ marginTop: 32 }}>
         <Title icon="📋">Mes productions récentes</Title>
         {my.length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucune production enregistrée.</p>
@@ -391,9 +370,11 @@ function Admin({ data, setData }) {
   };
 
   const paySalary = async (empId) => {
-    const a = parseFloat(salaryAmount); if (!a || a <= 0) return;
+    const a = parseFloat(salaryAmount) || WORK_CONTRACT.pay;
+    if (!a || a <= 0) return;
     const emp = data.employees.find(e => e.id === empId);
-    const expense = { id: gid(), category: "Salaires", amount: a, description: `Salaire — ${emp?.name}${salaryNote ? ` (${salaryNote})` : ""}`, employeeId: empId, timestamp: Date.now() };
+    const note = salaryNote || (parseFloat(salaryAmount) ? "" : "Contrat journalier");
+    const expense = { id: gid(), category: "Salaires", amount: a, description: `Salaire — ${emp?.name}${note ? ` (${note})` : ""}`, employeeId: empId, timestamp: Date.now() };
     const u = { ...data, expenses: [...data.expenses, expense] };
     setData(u); await saveData(u); setSalaryEmpId(null); setSalaryAmount(""); setSalaryNote("");
   };
@@ -564,24 +545,60 @@ function Admin({ data, setData }) {
                     </div>
 
                     {/* Salary section */}
-                    <div style={{ marginTop: 12, padding: "10px 14px", background: "rgba(0,0,0,.2)", borderRadius: 4, border: `1px solid ${C.border}` }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ color: C.muted, fontSize: 15 }}>💰 Total salaires versés : <strong style={{ color: C.gold, fontSize: 18 }}>${totalSalary.toFixed(2)}</strong></span>
-                        <button onClick={() => { setSalaryEmpId(salaryEmpId === emp.id ? null : emp.id); setSalaryAmount(""); setSalaryNote(""); }} style={{ ...btnP, padding: "6px 14px", fontSize: 12 }}>{salaryEmpId === emp.id ? "ANNULER" : "+ SALAIRE"}</button>
+                    <div style={{ marginTop: 12, padding: "14px", background: "rgba(0,0,0,.2)", borderRadius: 4, border: `1px solid ${C.border}` }}>
+                      <div style={{ color: C.gold, fontWeight: 700, fontSize: 16, fontFamily: "'Playfair Display',serif", marginBottom: 8 }}>📋 Contrat de travail — {WORK_CONTRACT.duration}</div>
+                      <div style={{ color: C.muted, fontSize: 14, marginBottom: 10 }}>Paye : <strong style={{ color: C.greenLt }}>${WORK_CONTRACT.pay.toFixed(2)}</strong> / jour — Conditions :</div>
+
+                      {/* Check today's production against requirements */}
+                      {(() => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const todayStart = today.getTime();
+                        const todayEnd = todayStart + 86400000;
+                        const todayProds = data.productions.filter(p => p.employeeName.toLowerCase() === emp.name.toLowerCase() && p.timestamp >= todayStart && p.timestamp < todayEnd);
+                        const todayTots = {};
+                        todayProds.forEach(p => { todayTots[p.resourceId] = (todayTots[p.resourceId] || 0) + p.quantity; });
+
+                        const allMet = WORK_CONTRACT.requirements.every(r => (todayTots[r.resourceId] || 0) >= r.minQty);
+
+                        return <>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            {WORK_CONTRACT.requirements.map(req => {
+                              const got = todayTots[req.resourceId] || 0;
+                              const met = got >= req.minQty;
+                              const item = ALL_ITEMS.find(x => x.id === req.resourceId);
+                              return <div key={req.resourceId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: met ? "rgba(90,143,74,.1)" : "rgba(155,48,48,.1)", borderRadius: 3, border: `1px solid ${met ? C.green : C.red}` }}>
+                                <span style={{ color: item?.color, fontSize: 15 }}>{item?.icon} {req.label}</span>
+                                <span style={{ color: met ? C.greenLt : C.redLt, fontWeight: 700, fontSize: 15 }}>{Math.floor(got)} / {req.minQty} {met ? "✓" : "✗"}</span>
+                              </div>;
+                            })}
+                          </div>
+                          <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ color: allMet ? C.greenLt : C.redLt, fontWeight: 700, fontSize: 15 }}>{allMet ? "✓ Quotas atteints aujourd'hui" : "✗ Quotas non atteints"}</span>
+                            <button onClick={() => paySalary(emp.id)} disabled={!allMet} style={{ ...btnP, padding: "8px 18px", fontSize: 13, opacity: allMet ? 1 : 0.4, cursor: allMet ? "pointer" : "not-allowed" }}>VALIDER LA PAYE ${WORK_CONTRACT.pay}</button>
+                          </div>
+                        </>;
+                      })()}
+
+                      {/* Salary history + manual salary */}
+                      <Divider />
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                        <span style={{ color: C.muted, fontSize: 15 }}>💰 Total versé : <strong style={{ color: C.gold, fontSize: 18 }}>${totalSalary.toFixed(2)}</strong></span>
+                        <button onClick={() => { setSalaryEmpId(salaryEmpId === emp.id ? null : emp.id); setSalaryAmount(""); setSalaryNote(""); }} style={{ ...btnS, padding: "4px 12px", fontSize: 12 }}>{salaryEmpId === emp.id ? "Annuler" : "+ Salaire libre"}</button>
                       </div>
                       {salaryEmpId === emp.id && (
-                        <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                        <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
                           <input type="number" value={salaryAmount} onChange={e => setSalaryAmount(e.target.value)} placeholder="Montant ($)" style={inp} min="0" step="0.01" />
                           <input value={salaryNote} onChange={e => setSalaryNote(e.target.value)} placeholder="Note (optionnel)" style={inp} />
-                          <button onClick={() => paySalary(emp.id)} style={{ ...btnP, padding: "10px 20px" }}>VERSER LE SALAIRE</button>
+                          <button onClick={() => paySalary(emp.id)} style={{ ...btnP, padding: "8px 16px" }}>VERSER</button>
                         </div>
                       )}
                       {empSalaries.length > 0 && (
-                        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
                           {empSalaries.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5).map(s => (
-                            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14 }}>
+                            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
                               <span style={{ color: C.muted }}>{fmtDT(s.timestamp)} — <strong style={{ color: C.redLt }}>${s.amount.toFixed(2)}</strong>{s.description.includes("(") && <span style={{ color: C.dark }}> {s.description.split("(").slice(1).join("(").replace(")", "")}</span>}</span>
-                              <button onClick={() => rm("expenses", s.id)} style={{ ...btnD, padding: "2px 8px", fontSize: 11 }}>✕</button>
+                              <button onClick={() => rm("expenses", s.id)} style={{ ...btnD, padding: "2px 6px", fontSize: 11 }}>✕</button>
                             </div>
                           ))}
                         </div>
