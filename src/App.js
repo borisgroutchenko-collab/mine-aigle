@@ -148,11 +148,13 @@ function PTag({ id, big }) {
 function PriceReminder({ rid }) {
   const i = PRICE_INFO[rid]; if (!i) return null;
   const it = ALL_ITEMS.find(x => x.id === rid);
+  const bbl = BBL_PRICES[rid];
   return (
     <div style={{ background: "rgba(201,168,76,.06)", border: `1px solid ${C.goldDk}`, borderRadius: 3, padding: "10px 14px", marginTop: 8 }}>
-      <span style={{ color: C.muted, fontSize: 15 }}>💲 Fourchette pour <strong style={{ color: C.goldLt }}>{it?.name}</strong> : </span>
+      <div><span style={{ color: C.muted, fontSize: 15 }}>💲 Fourchette pour <strong style={{ color: C.goldLt }}>{it?.name}</strong> : </span>
       {i.libre ? <span style={{ color: C.gold, fontWeight: 700 }}>Prix libre</span> : <span style={{ color: C.gold, fontWeight: 700, fontSize: 17 }}>${i.min?.toFixed(2)} – ${i.max?.toFixed(2)}</span>}
-      {i.export && <span style={{ color: C.greenLt, marginLeft: 8, fontSize: 12, fontWeight: 700 }}>(Exportateur ✓)</span>}
+      {i.export && <span style={{ color: C.greenLt, marginLeft: 8, fontSize: 12, fontWeight: 700 }}>(Exportateur ✓)</span>}</div>
+      {bbl && <div style={{ marginTop: 6 }}><span style={{ color: C.muted, fontSize: 14 }}>📦 Rachat BBL : </span><span style={{ color: "#C9A84C", fontWeight: 700, fontSize: 16 }}>${bbl.toFixed(3)}</span></div>}
     </div>
   );
 }
@@ -175,135 +177,6 @@ function Modal({ open, onClose, title, children }) {
 
 function Row({ children, style = {} }) {
   return <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", ...style }}>{children}</div>;
-}
-
-// ── EMPLOYEE VIEW ──
-function EmployeeView({ name, data, setData }) {
-  const [rid, setRid] = useState(RAW_RESOURCES[0].id);
-  const [qty, setQty] = useState("");
-  const [note, setNote] = useState("");
-  const [editId, setEditId] = useState(null);
-  const [editRid, setEditRid] = useState("");
-  const [editQty, setEditQty] = useState("");
-  const [editNote, setEditNote] = useState("");
-  const my = data.productions.filter(p => p.employeeName.toLowerCase() === name.toLowerCase()).sort((a, b) => b.timestamp - a.timestamp);
-
-  const submit = async () => {
-    const q = parseFloat(qty); if (!q || q <= 0) return;
-    const updated = { ...data, productions: [...data.productions, { id: gid(), employeeName: name, resourceId: rid, quantity: q, note: note.trim(), timestamp: Date.now() }] };
-    setData(updated); await saveData(updated); setQty(""); setNote("");
-  };
-
-  const startEdit = (p) => {
-    setEditId(p.id);
-    setEditRid(p.resourceId);
-    setEditQty(String(p.quantity));
-    setEditNote(p.note || "");
-  };
-
-  const cancelEdit = () => { setEditId(null); };
-
-  const saveEdit = async () => {
-    const q = parseFloat(editQty); if (!q || q <= 0) return;
-    const updated = { ...data, productions: data.productions.map(p => p.id === editId ? { ...p, resourceId: editRid, quantity: q, note: editNote.trim() } : p) };
-    setData(updated); await saveData(updated); setEditId(null);
-  };
-
-  const deleteProd = async (id) => {
-    const updated = { ...data, productions: data.productions.filter(p => p.id !== id) };
-    setData(updated); await saveData(updated);
-    if (editId === id) setEditId(null);
-  };
-
-  return (
-    <div style={{ padding: 28 }}>
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <div style={{ fontSize: 48, marginBottom: 8 }}>🤠</div>
-        <p style={{ color: C.muted, fontSize: 20, margin: 0 }}>Bienvenue, <span style={{ color: C.gold, fontWeight: 700, fontSize: 26, fontFamily: "'Playfair Display',serif" }}>{name}</span></p>
-      </div>
-      <Card>
-        <div style={{ padding: 28 }}>
-          <h3 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 800, margin: "0 0 20px" }}>⛏️ Déclarer une production</h3>
-          <Divider />
-          <div style={{ display: "grid", gap: 18, marginTop: 16 }}>
-            <div><label style={{ color: C.muted, fontSize: 16, display: "block", marginBottom: 6, fontWeight: 600 }}>Ressource extraite</label><select value={rid} onChange={e => setRid(e.target.value)} style={sel}>{RAW_RESOURCES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}</select></div>
-            <div><label style={{ color: C.muted, fontSize: 16, display: "block", marginBottom: 6, fontWeight: 600 }}>Quantité</label><input type="number" value={qty} onChange={e => setQty(e.target.value)} placeholder="Ex: 10" style={inp} min="0" step="1" /></div>
-            <div><label style={{ color: C.muted, fontSize: 16, display: "block", marginBottom: 6, fontWeight: 600 }}>Note (optionnel)</label><input value={note} onChange={e => setNote(e.target.value)} placeholder="Ex: Filon nord" style={inp} /></div>
-            <button onClick={submit} style={{ ...btnP, fontSize: 16, padding: "16px 32px" }}>ENREGISTRER LA PRODUCTION</button>
-          </div>
-        </div>
-      </Card>
-      {/* Salary display - read only */}
-      {(() => {
-        const emp = data.employees.find(e => e.name.toLowerCase() === name.toLowerCase());
-        const mySalaries = emp ? data.expenses.filter(e => e.employeeId === emp.id && e.category === "Salaires") : [];
-        const totalSalary = mySalaries.reduce((s, e) => s + e.amount, 0);
-        return (
-          <Card style={{ marginTop: 24 }}>
-            <div style={{ padding: 22 }}>
-              <h3 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 800, margin: "0 0 12px" }}>💰 Mes salaires</h3>
-              <Divider />
-              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 16 }}>
-                <span style={{ color: C.muted, fontSize: 17 }}>Total perçu :</span>
-                <span style={{ color: C.greenLt, fontSize: 32, fontFamily: "'Playfair Display',serif", fontWeight: 900 }}>${totalSalary.toFixed(2)}</span>
-              </div>
-              {mySalaries.length > 0 && (
-                <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
-                  {mySalaries.sort((a, b) => b.timestamp - a.timestamp).map(s => (
-                    <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 14px", background: "rgba(0,0,0,.2)", borderRadius: 4, border: `1px solid ${C.border}` }}>
-                      <span style={{ color: C.greenLt, fontWeight: 700, fontSize: 17 }}>${s.amount.toFixed(2)}</span>
-                      <span style={{ color: C.dark, fontSize: 14 }}>{fmtDT(s.timestamp)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {mySalaries.length === 0 && <p style={{ color: C.dark, fontStyle: "italic", fontSize: 15, marginTop: 8 }}>Aucun salaire versé pour le moment.</p>}
-            </div>
-          </Card>
-        );
-      })()}
-
-      <div style={{ marginTop: 32 }}>
-        <Title icon="📋">Mes productions récentes</Title>
-        {my.length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucune production enregistrée.</p>
-          : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{my.slice(0, 30).map(p => { const r = ALL_ITEMS.find(x => x.id === p.resourceId);
-
-            if (editId === p.id) {
-              return (
-                <Card key={p.id} style={{ border: `2px solid ${C.accentLt}` }}>
-                  <div style={{ padding: 20 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                      <span style={{ color: C.gold, fontWeight: 700, fontSize: 16, fontFamily: "'Playfair Display',serif" }}>✏️ Modifier cette production</span>
-                      <span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(p.timestamp)}</span>
-                    </div>
-                    <div style={{ display: "grid", gap: 12 }}>
-                      <div><label style={{ color: C.muted, fontSize: 14, display: "block", marginBottom: 4 }}>Ressource</label><select value={editRid} onChange={e => setEditRid(e.target.value)} style={sel}>{RAW_RESOURCES.map(r2 => <option key={r2.id} value={r2.id}>{r2.icon} {r2.name}</option>)}</select></div>
-                      <div><label style={{ color: C.muted, fontSize: 14, display: "block", marginBottom: 4 }}>Quantité</label><input type="number" value={editQty} onChange={e => setEditQty(e.target.value)} style={inp} min="0" step="1" /></div>
-                      <div><label style={{ color: C.muted, fontSize: 14, display: "block", marginBottom: 4 }}>Note</label><input value={editNote} onChange={e => setEditNote(e.target.value)} style={inp} /></div>
-                      <div style={{ display: "flex", gap: 10 }}>
-                        <button onClick={saveEdit} style={{ ...btnP, flex: 1, padding: "12px 20px" }}>SAUVEGARDER</button>
-                        <button onClick={cancelEdit} style={{ ...btnS, flex: 1, padding: "12px 20px" }}>ANNULER</button>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              );
-            }
-
-            return (
-              <Row key={p.id}>
-                <div><span style={{ color: r?.color, fontWeight: 700, fontSize: 18 }}>{r?.icon} {r?.name}</span><span style={{ color: C.goldLt, marginLeft: 12, fontSize: 20, fontWeight: 700 }}>×{p.quantity}</span>{p.note && <span style={{ color: C.dark, marginLeft: 12, fontSize: 15 }}>— {p.note}</span>}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(p.timestamp)}</span>
-                  <button onClick={() => startEdit(p)} style={{ ...btnS, padding: "4px 10px", fontSize: 13, color: C.gold, borderColor: C.goldDk }}>✏️</button>
-                  <button onClick={() => deleteProd(p.id)} style={{ ...btnD, padding: "4px 10px", fontSize: 13 }}>✕</button>
-                </div>
-              </Row>
-            );
-          })}</div>}
-      </div>
-    </div>
-  );
 }
 
 // ── ADMIN ──
@@ -687,6 +560,7 @@ function Admin({ data, setData }) {
                         <div style={{ display: "grid", gap: 8 }}>
                           <select value={item.resourceId} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], resourceId: e.target.value }; setEditCon({ ...editCon, items: ni }); }} style={sel}>{sellable.map(r2 => <option key={r2.id} value={r2.id}>{r2.icon} {r2.name}</option>)}</select>
                           {ecPi && !ecPi.libre && ecPi.min != null && <span style={{ color: C.goldDk, fontSize: 13 }}>💲 {ecPi.min.toFixed(2)} – {ecPi.max.toFixed(2)} $</span>}
+                          {BBL_PRICES[item.resourceId] && <span style={{ color: "#C9A84C", fontSize: 13, marginLeft: 8 }}>📦 BBL : ${BBL_PRICES[item.resourceId].toFixed(3)}</span>}
                           <div style={{ display: "flex", gap: 8 }}>
                             <input type="number" value={item.totalQuantity} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], totalQuantity: e.target.value }; setEditCon({ ...editCon, items: ni }); }} placeholder="Qté" style={{ ...inp, flex: 1 }} min="0" />
                             <input type="number" value={item.pricePerUnit} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], pricePerUnit: e.target.value }; setEditCon({ ...editCon, items: ni }); }} placeholder="Prix/u" style={{ ...inp, flex: 1 }} min="0" step="0.01" />
@@ -889,6 +763,7 @@ function Admin({ data, setData }) {
               <div style={{ display: "grid", gap: 8 }}>
                 <select value={item.resourceId} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], resourceId: e.target.value }; setCf({ ...cf, items: ni }); }} style={sel}>{sellable.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}</select>
                 {cfPi && !cfPi.libre && cfPi.min != null && <span style={{ color: C.goldDk, fontSize: 13 }}>💲 Fourchette : {cfPi.min.toFixed(2)} – {cfPi.max.toFixed(2)} ${cfPi.export ? " (Export)" : ""}</span>}
+                {BBL_PRICES[item.resourceId] && <div style={{ marginTop: 2 }}><span style={{ color: "#C9A84C", fontSize: 13 }}>📦 Rachat BBL : ${BBL_PRICES[item.resourceId].toFixed(3)}</span></div>}
                 <div style={{ display: "flex", gap: 8 }}>
                   <input type="number" value={item.quantity} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], quantity: e.target.value }; setCf({ ...cf, items: ni }); }} placeholder="Quantité" style={{ ...inp, flex: 1 }} min="0" />
                   <input type="number" value={item.pricePerUnit} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], pricePerUnit: e.target.value }; setCf({ ...cf, items: ni }); }} placeholder="Prix/unité ($)" style={{ ...inp, flex: 1 }} min="0" step="0.01" />
@@ -973,7 +848,6 @@ export default function App() {
   const [data, setData] = useState(initState());
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState(null);
-  const [ln, setLn] = useState("");
   const [ac, setAc] = useState("");
   const [err, setErr] = useState("");
 
@@ -996,9 +870,9 @@ export default function App() {
     return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
-  const empLogin = () => { if (!ln.trim()) { setErr("Entrez votre nom."); return; } if (!data.employees.find(e => e.name.toLowerCase() === ln.trim().toLowerCase())) { setErr("Employé non trouvé. Demandez au patron de vous ajouter."); return; } setView("employee"); setErr(""); };
+  const empLogin = null;
   const admLogin = () => { if (ac !== ADMIN_CODE) { setErr("Code incorrect."); return; } setView("admin"); setErr(""); };
-  const logout = () => { setView(null); setLn(""); setAc(""); setErr(""); };
+  const logout = () => { setView(null); setAc(""); setErr(""); };
 
   if (loading) return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg, color: C.gold, fontFamily: "'Playfair Display',serif" }}>
@@ -1023,7 +897,7 @@ export default function App() {
           <p style={{ margin: "4px 0 0", color: C.dark, fontSize: 15, letterSpacing: 4, fontFamily: "'Playfair Display',serif", textTransform: "uppercase" }}>Gestion des Opérations Minières</p>
         </div>
         {view && <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span style={{ color: C.muted, fontSize: 17, fontWeight: 600 }}>{view === "admin" ? "🎩 Patron" : `🤠 ${ln}`}</span>
+          <span style={{ color: C.muted, fontSize: 17, fontWeight: 600 }}>🎩 Patron</span>
           <button onClick={logout} style={btnS}>Déconnexion</button>
         </div>}
       </div>
@@ -1034,21 +908,15 @@ export default function App() {
           <div style={{ fontSize: 88, marginBottom: 16, filter: "drop-shadow(0 4px 12px rgba(0,0,0,.5))" }}>🦅</div>
           <h2 style={{ fontFamily: "'Playfair Display',serif", color: C.gold, fontSize: 30, margin: 0, fontWeight: 900, letterSpacing: 3, textShadow: "0 2px 8px rgba(0,0,0,.5)" }}>CONNEXION</h2>
           <Divider />
-          <p style={{ color: C.dark, fontSize: 18, marginTop: 12 }}>Identifiez-vous pour accéder à la mine</p>
+          <p style={{ color: C.dark, fontSize: 18, marginTop: 12 }}>Accès réservé à la direction</p>
         </div>
         {err && <div style={{ background: "rgba(155,48,48,.15)", border: `2px solid ${C.red}`, borderRadius: 4, padding: "12px 18px", marginBottom: 20, color: C.redLt, fontSize: 17, fontWeight: 600 }}>⚠ {err}</div>}
-        <Card style={{ marginBottom: 24 }}><div style={{ padding: 28 }}>
-          <h3 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 800, margin: "0 0 16px" }}>🤠 Employé</h3>
-          <div style={{ display: "flex", gap: 10 }}><input value={ln} onChange={e => setLn(e.target.value)} placeholder="Votre nom" style={{ ...inp, flex: 1 }} onKeyDown={e => e.key === "Enter" && empLogin()} /><button onClick={empLogin} style={btnP}>ENTRER</button></div>
-        </div></Card>
-        <div style={{ margin: "24px 0", textAlign: "center" }}><Divider /></div>
         <Card><div style={{ padding: 28 }}>
           <h3 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 800, margin: "0 0 16px" }}>🎩 Patron</h3>
           <div style={{ display: "flex", gap: 10 }}><input type="password" value={ac} onChange={e => setAc(e.target.value)} placeholder="Code d'accès" style={{ ...inp, flex: 1 }} onKeyDown={e => e.key === "Enter" && admLogin()} /><button onClick={admLogin} style={btnP}>ENTRER</button></div>
         </div></Card>
       </div>}
 
-      {view === "employee" && <div style={{ maxWidth: 800, margin: "0 auto", animation: "fadeIn .4s" }}><EmployeeView name={ln.trim()} data={data} setData={setData} /></div>}
       {view === "admin" && <div style={{ maxWidth: 1050, margin: "0 auto", animation: "fadeIn .4s" }}><Admin data={data} setData={setData} /></div>}
     </div>
   );
