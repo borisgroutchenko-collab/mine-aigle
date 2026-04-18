@@ -306,8 +306,11 @@ function Admin({ data, setData }) {
   const addProd = async () => { const q = parseFloat(pf.quantity); if (!pf.employeeName || !q || q <= 0) return; const u = { ...data, productions: [...data.productions, { id: gid(), employeeName: pf.employeeName, resourceId: pf.resourceId, quantity: q, note: pf.note.trim() || "Ajouté par le patron", timestamp: Date.now() }] }; setData(u); await saveData(u); setPf({ employeeName: "", resourceId: RAW_RESOURCES[0].id, quantity: "", note: "" }); setModal(null); };
 
   const saveProd = async () => {
-    const q = parseFloat(editProd.quantity); if (!q || q <= 0 || !editProd.employeeName) return;
-    const u = { ...data, productions: data.productions.map(p => p.id === editProdId ? { ...p, employeeName: editProd.employeeName, resourceId: editProd.resourceId, quantity: q, note: editProd.note.trim() } : p) };
+    const delta = parseFloat(editProd.correction); if (isNaN(delta) || delta === 0) return;
+    const prod = data.productions.find(p => p.id === editProdId); if (!prod) return;
+    const newQty = prod.quantity + delta;
+    if (newQty <= 0) { alert("La quantité ne peut pas être négative ou nulle."); return; }
+    const u = { ...data, productions: data.productions.map(p => p.id === editProdId ? { ...p, quantity: newQty } : p) };
     setData(u); await saveData(u); setEditProdId(null);
   };
 
@@ -501,18 +504,25 @@ function Admin({ data, setData }) {
             {[...data.productions].sort((a, b) => b.timestamp - a.timestamp).slice(0, 50).map(p => { const r = ALL_ITEMS.find(x => x.id === p.resourceId);
 
               if (editProdId === p.id) {
+                const delta = parseFloat(editProd.correction) || 0;
+                const newQty = p.quantity + delta;
                 return <Card key={p.id} style={{ border: `2px solid ${C.accentLt}` }}><div style={{ padding: 20 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                     <span style={{ color: C.gold, fontWeight: 700, fontSize: 16, fontFamily: "'Playfair Display',serif" }}>✏️ Corriger cette extraction</span>
                     <span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(p.timestamp)}</span>
                   </div>
                   <div style={{ display: "grid", gap: 12 }}>
-                    <div>{lbl("Employé")}<select value={editProd.employeeName} onChange={e => setEditProd({ ...editProd, employeeName: e.target.value })} style={sel}><option value="">— Sélectionner —</option>{data.employees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}</select></div>
-                    <div>{lbl("Ressource")}<select value={editProd.resourceId} onChange={e => setEditProd({ ...editProd, resourceId: e.target.value })} style={sel}>{RAW_RESOURCES.map(r2 => <option key={r2.id} value={r2.id}>{r2.icon} {r2.name}</option>)}</select></div>
-                    <div>{lbl("Quantité")}<input type="number" value={editProd.quantity} onChange={e => setEditProd({ ...editProd, quantity: e.target.value })} style={inp} min="0" step="1" /></div>
-                    <div>{lbl("Note")}<input value={editProd.note} onChange={e => setEditProd({ ...editProd, note: e.target.value })} style={inp} /></div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "rgba(0,0,0,.2)", borderRadius: 4, border: `1px solid ${C.border}` }}>
+                      <span style={{ color: C.muted, fontSize: 16 }}>{p.employeeName} — {r?.icon} {r?.name}</span>
+                      <span style={{ color: C.goldLt, fontWeight: 700, fontSize: 20 }}>Actuel : {p.quantity}</span>
+                    </div>
+                    <div>{lbl("Correction (ex: 50 pour ajouter, -20 pour retirer)")}<input type="number" value={editProd.correction} onChange={e => setEditProd({ ...editProd, correction: e.target.value })} placeholder="Ex: 50 ou -20" style={inp} /></div>
+                    {editProd.correction !== "" && <div style={{ padding: "10px 14px", background: "rgba(0,0,0,.2)", borderRadius: 4, border: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: C.muted, fontSize: 15 }}>Nouveau total :</span>
+                      <span style={{ color: newQty > 0 ? C.greenLt : C.redLt, fontWeight: 700, fontSize: 22 }}>{newQty}</span>
+                    </div>}
                     <div style={{ display: "flex", gap: 10 }}>
-                      <button onClick={saveProd} style={{ ...btnP, flex: 1, padding: "12px 20px" }}>SAUVEGARDER</button>
+                      <button onClick={saveProd} style={{ ...btnP, flex: 1, padding: "12px 20px" }}>CORRIGER</button>
                       <button onClick={() => setEditProdId(null)} style={{ ...btnS, flex: 1, padding: "12px 20px" }}>ANNULER</button>
                     </div>
                   </div>
@@ -528,7 +538,7 @@ function Admin({ data, setData }) {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(p.timestamp)}</span>
-                  <button onClick={() => { setEditProdId(p.id); setEditProd({ employeeName: p.employeeName, resourceId: p.resourceId, quantity: String(p.quantity), note: p.note || "" }); }} style={{ ...btnS, padding: "4px 10px", fontSize: 13, color: C.gold, borderColor: C.goldDk }}>✏️</button>
+                  <button onClick={() => { setEditProdId(p.id); setEditProd({ correction: "" }); }} style={{ ...btnS, padding: "4px 10px", fontSize: 13, color: C.gold, borderColor: C.goldDk }}>✏️</button>
                   <button onClick={() => rm("productions", p.id)} style={{ ...btnD, padding: "4px 10px", fontSize: 13 }}>✕</button>
                 </div>
               </Row>); })}
