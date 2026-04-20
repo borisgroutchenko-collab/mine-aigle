@@ -74,6 +74,7 @@ const EXPENSE_CATEGORIES = ["Pioches & Outils","Dynamite & Explosifs","Bois de s
 
 const initState = () => ({ employees: [], productions: [], crafts: [], contracts: [], sales: [], expenses: [], stockAdjustments: [] });
 function gid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
+function num(v) { return num(String(v).replace(",", ".")); }
 function fmtDate(ts) { if (!ts) return "—"; return new Date(ts).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }); }
 function fmtDT(ts) { if (!ts) return "—"; const d = new Date(ts); return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); }
 
@@ -245,17 +246,17 @@ function Admin({ data, setData }) {
   };
 
   const paySalary = async (empId) => {
-    const a = parseFloat(salaryAmount) || WORK_CONTRACT.pay;
+    const a = num(salaryAmount) || WORK_CONTRACT.pay;
     if (!a || a <= 0) return;
     const emp = data.employees.find(e => e.id === empId);
-    const note = salaryNote || (parseFloat(salaryAmount) ? "" : "Contrat journalier");
+    const note = salaryNote || (num(salaryAmount) ? "" : "Contrat journalier");
     const expense = { id: gid(), category: "Salaires", amount: a, description: `Salaire — ${emp?.name}${note ? ` (${note})` : ""}`, employeeId: empId, timestamp: Date.now() };
     const u = { ...data, expenses: [...data.expenses, expense] };
     setData(u); await saveData(u); setSalaryEmpId(null); setSalaryAmount(""); setSalaryNote("");
   };
 
   const editSale = async (saleId) => {
-    const newQty = parseFloat(editSaleQty); if (!newQty || newQty <= 0) return;
+    const newQty = num(editSaleQty); if (!newQty || newQty <= 0) return;
     const sale = data.sales.find(s => s.id === saleId); if (!sale) return;
     const diff = newQty - sale.quantity;
     const updatedSales = data.sales.map(s => s.id === saleId ? { ...s, quantity: newQty, totalPrice: newQty * s.pricePerUnit } : s);
@@ -279,8 +280,8 @@ function Admin({ data, setData }) {
 
   const addContract = async () => {
     if (!cf.buyer.trim()) return;
-    const items = cf.items.filter(i => parseFloat(i.quantity) > 0 && parseFloat(i.pricePerUnit) > 0).map(i => ({
-      id: gid(), resourceId: i.resourceId, totalQuantity: parseFloat(i.quantity), deliveredQuantity: 0, pricePerUnit: parseFloat(i.pricePerUnit)
+    const items = cf.items.filter(i => num(i.quantity) > 0 && num(i.pricePerUnit) > 0).map(i => ({
+      id: gid(), resourceId: i.resourceId, totalQuantity: num(i.quantity), deliveredQuantity: 0, pricePerUnit: num(i.pricePerUnit)
     }));
     if (items.length === 0) return;
     const contract = { id: gid(), buyer: cf.buyer.trim(), items, notes: cf.notes.trim(), status: "active", createdAt: Date.now() };
@@ -289,7 +290,7 @@ function Admin({ data, setData }) {
   };
 
   const doSale = async () => {
-    const q = parseFloat(sf.quantity); if (!sf.contractId || !sf.itemId || !q || q <= 0) return;
+    const q = num(sf.quantity); if (!sf.contractId || !sf.itemId || !q || q <= 0) return;
     const con = data.contracts.find(c => c.id === sf.contractId); if (!con) return;
     const item = (con.items || []).find(i => i.id === sf.itemId); if (!item) return;
     if (item.resourceId !== "divers" && (stocks[item.resourceId] || 0) < q) { alert("Stock insuffisant !"); return; }
@@ -302,15 +303,15 @@ function Admin({ data, setData }) {
   };
 
   const addExp = async () => {
-    const a = parseFloat(ef.amount); if (!a || !ef.description.trim()) return;
+    const a = num(ef.amount); if (!a || !ef.description.trim()) return;
     const u = { ...data, expenses: [...data.expenses, { id: gid(), category: ef.category, amount: a, description: ef.description.trim(), timestamp: Date.now() }] };
     setData(u); await saveData(u); setEf({ category: EXPENSE_CATEGORIES[0], amount: "", description: "" }); setModal(null);
   };
 
-  const addProd = async () => { const q = parseFloat(pf.quantity); if (!pf.employeeName || !q || q <= 0) return; const u = { ...data, productions: [...data.productions, { id: gid(), employeeName: pf.employeeName, resourceId: pf.resourceId, quantity: q, note: pf.note.trim() || "Ajouté par le patron", timestamp: Date.now() }] }; setData(u); await saveData(u); setPf({ employeeName: "", resourceId: RAW_RESOURCES[0].id, quantity: "", note: "" }); setModal(null); };
+  const addProd = async () => { const q = num(pf.quantity); if (!pf.employeeName || !q || q <= 0) return; const u = { ...data, productions: [...data.productions, { id: gid(), employeeName: pf.employeeName, resourceId: pf.resourceId, quantity: q, note: pf.note.trim() || "Ajouté par le patron", timestamp: Date.now() }] }; setData(u); await saveData(u); setPf({ employeeName: "", resourceId: RAW_RESOURCES[0].id, quantity: "", note: "" }); setModal(null); };
 
   const saveProd = async () => {
-    const delta = parseFloat(editProd.correction); if (isNaN(delta) || delta === 0) return;
+    const delta = num(editProd.correction); if (isNaN(delta) || delta === 0) return;
     const prod = data.productions.find(p => p.id === editProdId); if (!prod) return;
     const newQty = prod.quantity + delta;
     if (newQty <= 0) { alert("La quantité ne peut pas être négative ou nulle."); return; }
@@ -327,7 +328,7 @@ function Admin({ data, setData }) {
   };
 
   const adjustStock = async () => {
-    const target = parseFloat(adjQty); if (isNaN(target) || target < 0) return;
+    const target = num(adjQty); if (isNaN(target) || target < 0) return;
     const current = stocks[adjItem] || 0;
     const diff = target - current;
     if (diff === 0) { setModal(null); return; }
@@ -338,8 +339,8 @@ function Admin({ data, setData }) {
 
   const saveContract = async () => {
     if (!editCon.buyer.trim()) return;
-    const items = editCon.items.filter(i => parseFloat(i.totalQuantity) > 0 && parseFloat(i.pricePerUnit) > 0).map(i => ({
-      ...i, totalQuantity: parseFloat(i.totalQuantity), pricePerUnit: parseFloat(i.pricePerUnit), deliveredQuantity: i.deliveredQuantity || 0
+    const items = editCon.items.filter(i => num(i.totalQuantity) > 0 && num(i.pricePerUnit) > 0).map(i => ({
+      ...i, totalQuantity: num(i.totalQuantity), pricePerUnit: num(i.pricePerUnit), deliveredQuantity: i.deliveredQuantity || 0
     }));
     if (items.length === 0) return;
     const allDone = items.every(i => i.deliveredQuantity >= i.totalQuantity);
@@ -476,7 +477,7 @@ function Admin({ data, setData }) {
                       </div>
                       {salaryEmpId === emp.id && (
                         <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                          <input type="number" value={salaryAmount} onChange={e => setSalaryAmount(e.target.value)} placeholder="Montant ($)" style={inp} min="0" step="0.01" />
+                          <input type="text" inputMode="decimal" value={salaryAmount} onChange={e => setSalaryAmount(e.target.value)} placeholder="Montant ($)" style={inp} min="0" step="0.01" />
                           <input value={salaryNote} onChange={e => setSalaryNote(e.target.value)} placeholder="Note (optionnel)" style={inp} />
                           <button onClick={() => paySalary(emp.id)} style={{ ...btnP, padding: "8px 16px" }}>VERSER</button>
                         </div>
@@ -508,7 +509,7 @@ function Admin({ data, setData }) {
             {[...data.productions].sort((a, b) => b.timestamp - a.timestamp).slice(0, 50).map(p => { const r = ALL_ITEMS.find(x => x.id === p.resourceId);
 
               if (editProdId === p.id) {
-                const delta = parseFloat(editProd.correction) || 0;
+                const delta = num(editProd.correction) || 0;
                 const newQty = p.quantity + delta;
                 return <Card key={p.id} style={{ border: `2px solid ${C.accentLt}` }}><div style={{ padding: 20 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -610,7 +611,7 @@ function Admin({ data, setData }) {
                           {BBL_PRICES[item.resourceId] && <span style={{ color: "#C9A84C", fontSize: 13, marginLeft: 8 }}>📦 BBL : ${BBL_PRICES[item.resourceId].toFixed(3)}</span>}
                           <div style={{ display: "flex", gap: 8 }}>
                             <input type="number" value={item.totalQuantity} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], totalQuantity: e.target.value }; setEditCon({ ...editCon, items: ni }); }} placeholder="Qté" style={{ ...inp, flex: 1 }} min="0" />
-                            <input type="number" value={item.pricePerUnit} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], pricePerUnit: e.target.value }; setEditCon({ ...editCon, items: ni }); }} placeholder="Prix/u" style={{ ...inp, flex: 1 }} min="0" step="0.01" />
+                            <input type="text" inputMode="decimal" value={item.pricePerUnit} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], pricePerUnit: e.target.value }; setEditCon({ ...editCon, items: ni }); }} placeholder="Prix/u" style={{ ...inp, flex: 1 }} min="0" step="0.01" />
                           </div>
                         </div>
                       </div>;
@@ -681,7 +682,7 @@ function Admin({ data, setData }) {
                     <button onClick={() => editSale(s.id)} style={{ ...btnP, padding: "12px 20px" }}>CORRIGER</button>
                     <button onClick={() => setEditSaleId(null)} style={{ ...btnS, padding: "12px 16px" }}>ANNULER</button>
                   </div>
-                  {editSaleQty && <div style={{ color: C.muted, fontSize: 14, marginTop: 8 }}>Nouveau total : <strong style={{ color: C.greenLt }}>${((parseFloat(editSaleQty) || 0) * s.pricePerUnit).toFixed(2)}</strong> (diff stock : {((parseFloat(editSaleQty) || 0) - s.quantity) > 0 ? "+" : ""}{((parseFloat(editSaleQty) || 0) - s.quantity)})</div>}
+                  {editSaleQty && <div style={{ color: C.muted, fontSize: 14, marginTop: 8 }}>Nouveau total : <strong style={{ color: C.greenLt }}>${((num(editSaleQty) || 0) * s.pricePerUnit).toFixed(2)}</strong> (diff stock : {((num(editSaleQty) || 0) - s.quantity) > 0 ? "+" : ""}{((num(editSaleQty) || 0) - s.quantity)})</div>}
                 </div></Card>;
               }
               return <Row key={s.id}><div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 18 }}><span style={{ color: C.greenLt, fontWeight: 700, fontSize: 22 }}>${s.totalPrice.toFixed(2)}</span><span style={{ color: C.dark }}>—</span><span style={{ color: r?.color }}>{r?.icon} ×{s.quantity} {r?.name}</span><span style={{ color: C.muted }}>→ {s.buyer}</span></div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(s.timestamp)}</span><button onClick={() => { setEditSaleId(s.id); setEditSaleQty(String(s.quantity)); }} style={{ ...btnS, padding: "4px 10px", fontSize: 13, color: C.gold, borderColor: C.goldDk }}>✏️</button><button onClick={() => rm("sales", s.id)} style={{ ...btnD, padding: "4px 10px", fontSize: 13 }}>✕</button></div></Row>;
@@ -813,7 +814,7 @@ function Admin({ data, setData }) {
                 {BBL_PRICES[item.resourceId] && <div style={{ marginTop: 2 }}><span style={{ color: "#C9A84C", fontSize: 13 }}>📦 Rachat BBL : ${BBL_PRICES[item.resourceId].toFixed(3)}</span></div>}
                 <div style={{ display: "flex", gap: 8 }}>
                   <input type="number" value={item.quantity} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], quantity: e.target.value }; setCf({ ...cf, items: ni }); }} placeholder="Quantité" style={{ ...inp, flex: 1 }} min="0" />
-                  <input type="number" value={item.pricePerUnit} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], pricePerUnit: e.target.value }; setCf({ ...cf, items: ni }); }} placeholder="Prix/unité ($)" style={{ ...inp, flex: 1 }} min="0" step="0.01" />
+                  <input type="text" inputMode="decimal" value={item.pricePerUnit} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], pricePerUnit: e.target.value }; setCf({ ...cf, items: ni }); }} placeholder="Prix/unité ($)" style={{ ...inp, flex: 1 }} min="0" step="0.01" />
                 </div>
               </div>
             </div>;
@@ -838,7 +839,7 @@ function Admin({ data, setData }) {
                 const item = items.find(i => i.id === sf.itemId);
                 if (!item) return null;
                 const ir = ALL_ITEMS.find(x => x.id === item.resourceId);
-                const q = parseFloat(sf.quantity) || 0;
+                const q = num(sf.quantity) || 0;
                 return <>
                   <div style={{ background: "rgba(0,0,0,.3)", padding: 14, borderRadius: 4, border: `1px solid ${C.border}` }}>
                     <div style={{ color: C.muted, fontSize: 15, marginBottom: 4 }}>Stock : <strong style={{ color: C.goldLt }}>{Math.floor(stocks[item.resourceId] || 0)} {ir?.name}</strong></div>
@@ -857,7 +858,7 @@ function Admin({ data, setData }) {
       <Modal open={modal === "addExpense"} onClose={() => setModal(null)} title="Nouvelle Dépense">
         <div style={{ display: "grid", gap: 16 }}>
           <div>{lbl("Catégorie")}<select value={ef.category} onChange={e => setEf({ ...ef, category: e.target.value })} style={sel}>{EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-          <div>{lbl("Montant ($)")}<input type="number" value={ef.amount} onChange={e => setEf({ ...ef, amount: e.target.value })} placeholder="Ex: 15" style={inp} min="0" step="0.01" /></div>
+          <div>{lbl("Montant ($)")}<input type="text" inputMode="decimal" value={ef.amount} onChange={e => setEf({ ...ef, amount: e.target.value })} placeholder="Ex: 15" style={inp} min="0" step="0.01" /></div>
           <div>{lbl("Description")}<input value={ef.description} onChange={e => setEf({ ...ef, description: e.target.value })} placeholder="Ex: 3 pioches neuves" style={inp} /></div>
           <button onClick={addExp} style={{ ...btnP, fontSize: 16, padding: "16px 32px" }}>AJOUTER</button>
         </div>
@@ -881,7 +882,7 @@ function Admin({ data, setData }) {
             <div style={{ color: C.gold, fontSize: 28, fontFamily: "'Playfair Display',serif", fontWeight: 900, marginTop: 4 }}>{Math.floor(stocks[adjItem] || 0)}</div>
           </div>
           <div>{lbl("Stock réel (le chiffre que vous constatez)")}<input type="number" value={adjQty} onChange={e => setAdjQty(e.target.value)} placeholder="Ex: 42" style={inp} min="0" step="1" /></div>
-          {adjQty !== "" && <div style={{ color: C.muted, fontSize: 15 }}>Différence appliquée : <strong style={{ color: ((parseFloat(adjQty) || 0) - Math.floor(stocks[adjItem] || 0)) >= 0 ? C.greenLt : C.redLt, fontSize: 20 }}>{((parseFloat(adjQty) || 0) - Math.floor(stocks[adjItem] || 0)) >= 0 ? "+" : ""}{(parseFloat(adjQty) || 0) - Math.floor(stocks[adjItem] || 0)}</strong></div>}
+          {adjQty !== "" && <div style={{ color: C.muted, fontSize: 15 }}>Différence appliquée : <strong style={{ color: ((num(adjQty) || 0) - Math.floor(stocks[adjItem] || 0)) >= 0 ? C.greenLt : C.redLt, fontSize: 20 }}>{((num(adjQty) || 0) - Math.floor(stocks[adjItem] || 0)) >= 0 ? "+" : ""}{(num(adjQty) || 0) - Math.floor(stocks[adjItem] || 0)}</strong></div>}
           <div>{lbl("Raison (optionnel)")}<input value={adjNote} onChange={e => setAdjNote(e.target.value)} placeholder="Ex: Correction après inventaire" style={inp} /></div>
           <button onClick={adjustStock} style={{ ...btnP, fontSize: 16, padding: "16px 32px" }}>CORRIGER LE STOCK</button>
         </div>
