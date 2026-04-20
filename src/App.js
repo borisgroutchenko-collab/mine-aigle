@@ -301,7 +301,11 @@ function Admin({ data, setData }) {
     const u = { ...data, sales: [...data.sales, sale], contracts: uc }; setData(u); await saveData(u); setSf({ contractId: "", itemId: "", quantity: "" }); setModal(null);
   };
 
-  const addExp = async () => { const a = parseFloat(ef.amount); if (!a || !ef.description.trim()) return; const u = { ...data, expenses: [...data.expenses, { id: gid(), category: ef.category, amount: a, description: ef.description.trim(), timestamp: Date.now() }] }; setData(u); await saveData(u); setEf({ category: EXPENSE_CATEGORIES[0], amount: "", description: "" }); setModal(null); };
+  const addExp = async () => {
+    const a = parseFloat(ef.amount); if (!a || !ef.description.trim()) return;
+    const u = { ...data, expenses: [...data.expenses, { id: gid(), category: ef.category, amount: a, description: ef.description.trim(), timestamp: Date.now() }] };
+    setData(u); await saveData(u); setEf({ category: EXPENSE_CATEGORIES[0], amount: "", description: "" }); setModal(null);
+  };
 
   const addProd = async () => { const q = parseFloat(pf.quantity); if (!pf.employeeName || !q || q <= 0) return; const u = { ...data, productions: [...data.productions, { id: gid(), employeeName: pf.employeeName, resourceId: pf.resourceId, quantity: q, note: pf.note.trim() || "Ajouté par le patron", timestamp: Date.now() }] }; setData(u); await saveData(u); setPf({ employeeName: "", resourceId: RAW_RESOURCES[0].id, quantity: "", note: "" }); setModal(null); };
 
