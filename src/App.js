@@ -79,7 +79,7 @@ const WORK_CONTRACT = {
   ],
 };
 
-const EXPENSE_CATEGORIES = ["Pioches & Outils","Dynamite & Explosifs","Bois de soutènement","Équipement de sécurité","Transport & Chariots","Salaires","Nourriture & Provisions","Matériel divers","Taxes"];
+const EXPENSE_CATEGORIES = ["Pioches & Outils","Dynamite & Explosifs","Bois de soutènement","Équipement de sécurité","Transport & Chariots","Salaires","Nourriture & Provisions","Divers","Taxes"];
 
 const initState = () => ({ employees: [], productions: [], crafts: [], contracts: [], sales: [], expenses: [], stockAdjustments: [] });
 function gid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
