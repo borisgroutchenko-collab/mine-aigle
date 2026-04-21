@@ -83,7 +83,7 @@ const EXPENSE_CATEGORIES = ["Pioches & Outils","Dynamite & Explosifs","Bois de s
 
 const initState = () => ({ employees: [], productions: [], crafts: [], contracts: [], sales: [], expenses: [], stockAdjustments: [] });
 function gid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
-function num(v) { return num(String(v).replace(",", ".")); }
+function num(v) { return parseFloat(String(v).replace(",", ".")); }
 function fmtDate(ts) { if (!ts) return "—"; return new Date(ts).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }); }
 function fmtDT(ts) { if (!ts) return "—"; const d = new Date(ts); return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); }
 
