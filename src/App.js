@@ -205,6 +205,8 @@ function Admin({ data, setData }) {
   const [editSalaryId, setEditSalaryId] = useState(null);
   const [editSalaryAmount, setEditSalaryAmount] = useState("");
   const [editSalaryNote, setEditSalaryNote] = useState("");
+  const [editExpId, setEditExpId] = useState(null);
+  const [editExp, setEditExp] = useState({ category: "", amount: "", description: "" });
   const [editSaleId, setEditSaleId] = useState(null);
   const [editSaleQty, setEditSaleQty] = useState("");
   const [editConId, setEditConId] = useState(null);
@@ -326,6 +328,12 @@ function Admin({ data, setData }) {
     const a = num(ef.amount); if (!a || !ef.description.trim()) return;
     const u = { ...data, expenses: [...data.expenses, { id: gid(), category: ef.category, amount: a, description: ef.description.trim(), timestamp: Date.now() }] };
     setData(u); await saveData(u); setEf({ category: EXPENSE_CATEGORIES[0], amount: "", description: "" }); setModal(null);
+  };
+
+  const saveExpenseEdit = async () => {
+    const a = num(editExp.amount); if (!a || a <= 0 || !editExp.description.trim()) return;
+    const u = { ...data, expenses: data.expenses.map(e => e.id === editExpId ? { ...e, category: editExp.category, amount: a, description: editExp.description.trim() } : e) };
+    setData(u); await saveData(u); setEditExpId(null);
   };
 
   const addProd = async () => { const q = num(pf.quantity); if (!pf.employeeName || !q || q <= 0) return; const u = { ...data, productions: [...data.productions, { id: gid(), employeeName: pf.employeeName, resourceId: pf.resourceId, quantity: q, note: pf.note.trim() || "Ajouté par le patron", timestamp: Date.now() }] }; setData(u); await saveData(u); setPf({ employeeName: "", resourceId: RAW_RESOURCES[0].id, quantity: "", note: "" }); setModal(null); };
@@ -658,7 +666,28 @@ function Admin({ data, setData }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}><Title icon="🧾">Dépenses</Title><button onClick={() => setModal("addExpense")} style={btnP}>+ DÉPENSE</button></div>
         {data.expenses.length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucune dépense.</p>
           : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {[...data.expenses].sort((a, b) => b.timestamp - a.timestamp).map(x => <Row key={x.id}><div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 18 }}><span style={{ color: C.redLt, fontWeight: 700, fontSize: 22 }}>-${x.amount.toFixed(2)}</span><span style={{ color: C.dark }}>—</span><span style={{ color: C.muted, fontWeight: 600 }}>{x.category}</span><span style={{ color: C.dark }}>{x.description}</span></div><div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(x.timestamp)}</span><button onClick={() => rm("expenses", x.id)} style={{ ...btnD, padding: "4px 10px", fontSize: 13 }}>✕</button></div></Row>)}
+            {[...data.expenses].sort((a, b) => b.timestamp - a.timestamp).map(x => {
+
+              if (editExpId === x.id) {
+                return <Card key={x.id} style={{ border: `2px solid ${C.accentLt}` }}><div style={{ padding: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <span style={{ color: C.gold, fontWeight: 700, fontSize: 16, fontFamily: "'Playfair Display',serif" }}>✏️ Modifier cette dépense</span>
+                    <span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(x.timestamp)}</span>
+                  </div>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    <div>{lbl("Catégorie")}<select value={editExp.category} onChange={e => setEditExp({ ...editExp, category: e.target.value })} style={sel}>{EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                    <div>{lbl("Montant ($)")}<input type="text" inputMode="decimal" value={editExp.amount} onChange={e => setEditExp({ ...editExp, amount: e.target.value })} style={inp} /></div>
+                    <div>{lbl("Description")}<input value={editExp.description} onChange={e => setEditExp({ ...editExp, description: e.target.value })} style={inp} /></div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button onClick={saveExpenseEdit} style={{ ...btnP, flex: 1, padding: "12px 20px" }}>SAUVEGARDER</button>
+                      <button onClick={() => setEditExpId(null)} style={{ ...btnS, flex: 1, padding: "12px 20px" }}>ANNULER</button>
+                    </div>
+                  </div>
+                </div></Card>;
+              }
+
+              return <Row key={x.id}><div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 18 }}><span style={{ color: C.redLt, fontWeight: 700, fontSize: 22 }}>-${x.amount.toFixed(2)}</span><span style={{ color: C.dark }}>—</span><span style={{ color: C.muted, fontWeight: 600 }}>{x.category}</span><span style={{ color: C.dark }}>{x.description}</span></div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(x.timestamp)}</span><button onClick={() => { setEditExpId(x.id); setEditExp({ category: x.category, amount: String(x.amount), description: x.description }); }} style={{ ...btnS, padding: "4px 10px", fontSize: 13, color: C.gold, borderColor: C.goldDk }}>✏️</button><button onClick={() => rm("expenses", x.id)} style={{ ...btnD, padding: "4px 10px", fontSize: 13 }}>✕</button></div></Row>;
+            })}
           </div>}
       </div>}
 
