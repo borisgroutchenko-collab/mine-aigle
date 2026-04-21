@@ -54,6 +54,15 @@ const BBL_PRICES = {
   lingot_fer: 0.635,
 };
 
+const CATALOG_PRICES = {
+  lingot_fer: 1.40,
+  lingot_acier: 1.45,
+  amas_soufre: 1.20,
+  charbon: 1.00,
+  tete_outil: 3.20,
+  jarres: 0.05,
+};
+
 const SALARY_RATES = {
   charbon: { rate: 0.485, label: "Charbon" },
   minerai_fer: { rate: 0.127, label: "Minerai de fer" },
@@ -150,12 +159,14 @@ function PriceReminder({ rid }) {
   const i = PRICE_INFO[rid]; if (!i) return null;
   const it = ALL_ITEMS.find(x => x.id === rid);
   const bbl = BBL_PRICES[rid];
+  const cat = CATALOG_PRICES[rid];
   return (
     <div style={{ background: "rgba(201,168,76,.06)", border: `1px solid ${C.goldDk}`, borderRadius: 3, padding: "10px 14px", marginTop: 8 }}>
       <div><span style={{ color: C.muted, fontSize: 15 }}>💲 Fourchette pour <strong style={{ color: C.goldLt }}>{it?.name}</strong> : </span>
       {i.libre ? <span style={{ color: C.gold, fontWeight: 700 }}>Prix libre</span> : <span style={{ color: C.gold, fontWeight: 700, fontSize: 17 }}>${i.min?.toFixed(2)} – ${i.max?.toFixed(2)}</span>}
       {i.export && <span style={{ color: C.greenLt, marginLeft: 8, fontSize: 12, fontWeight: 700 }}>(Exportateur ✓)</span>}</div>
-      {bbl && <div style={{ marginTop: 6 }}><span style={{ color: C.muted, fontSize: 14 }}>📦 Rachat BBL : </span><span style={{ color: "#C9A84C", fontWeight: 700, fontSize: 16 }}>${bbl.toFixed(3)}</span></div>}
+      {cat && <div style={{ marginTop: 6 }}><span style={{ color: C.muted, fontSize: 14 }}>🏷️ Prix catalogue : </span><span style={{ color: C.goldLt, fontWeight: 700, fontSize: 16 }}>${cat.toFixed(2)}</span></div>}
+      {bbl && <div style={{ marginTop: 4 }}><span style={{ color: C.muted, fontSize: 14 }}>📦 Rachat BBL : </span><span style={{ color: "#C9A84C", fontWeight: 700, fontSize: 16 }}>${bbl.toFixed(3)}</span></div>}
     </div>
   );
 }
@@ -608,6 +619,7 @@ function Admin({ data, setData }) {
                         <div style={{ display: "grid", gap: 8 }}>
                           <select value={item.resourceId} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], resourceId: e.target.value }; setEditCon({ ...editCon, items: ni }); }} style={sel}>{sellable.map(r2 => <option key={r2.id} value={r2.id}>{r2.icon} {r2.name}</option>)}</select>
                           {ecPi && !ecPi.libre && ecPi.min != null && <span style={{ color: C.goldDk, fontSize: 13 }}>💲 {ecPi.min.toFixed(2)} – {ecPi.max.toFixed(2)} $</span>}
+                          {CATALOG_PRICES[item.resourceId] && <span style={{ color: C.goldLt, fontSize: 13, marginLeft: 8 }}>🏷️ Catalogue : ${CATALOG_PRICES[item.resourceId].toFixed(2)}</span>}
                           {BBL_PRICES[item.resourceId] && <span style={{ color: "#C9A84C", fontSize: 13, marginLeft: 8 }}>📦 BBL : ${BBL_PRICES[item.resourceId].toFixed(3)}</span>}
                           <div style={{ display: "flex", gap: 8 }}>
                             <input type="number" value={item.totalQuantity} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], totalQuantity: e.target.value }; setEditCon({ ...editCon, items: ni }); }} placeholder="Qté" style={{ ...inp, flex: 1 }} min="0" />
@@ -703,11 +715,12 @@ function Admin({ data, setData }) {
       {tab === "prices" && <div style={{ animation: "fadeIn .4s" }}>
         <Title icon="💲">Grille Tarifaire</Title>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {ALL_ITEMS.filter(i => PRICE_INFO[i.id]).map(item => { const i = PRICE_INFO[item.id]; const bbl = BBL_PRICES[item.id]; return <Card key={item.id}><div style={{ padding: "20px 26px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+          {ALL_ITEMS.filter(i => PRICE_INFO[i.id]).map(item => { const i = PRICE_INFO[item.id]; const bbl = BBL_PRICES[item.id]; const cat = CATALOG_PRICES[item.id]; return <Card key={item.id}><div style={{ padding: "20px 26px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}><span style={{ fontSize: 32 }}>{item.icon}</span><span style={{ color: item.color, fontWeight: 700, fontSize: 20, fontFamily: "'Playfair Display',serif" }}>{item.name}</span></div>
             <div style={{ textAlign: "right" }}>
               {i.libre ? <span style={{ color: C.muted, fontSize: 17, fontStyle: "italic" }}>Prix libre</span> : <span style={{ color: C.goldLt, fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700 }}>${i.min?.toFixed(2)} – ${i.max?.toFixed(2)}</span>}
-              {bbl && <div style={{ marginTop: 4 }}><span style={{ color: "#C9A84C", fontSize: 14, fontWeight: 700, background: "rgba(201,168,76,.1)", padding: "3px 10px", borderRadius: 3, border: `1px solid ${C.goldDk}` }}>BBL : ${bbl.toFixed(3)}</span></div>}
+              {cat && <div style={{ marginTop: 4 }}><span style={{ color: C.goldLt, fontSize: 14, fontWeight: 700, background: "rgba(232,213,163,.1)", padding: "3px 10px", borderRadius: 3, border: `1px solid ${C.goldDk}` }}>🏷️ Catalogue : ${cat.toFixed(2)}</span></div>}
+              {bbl && <div style={{ marginTop: 4 }}><span style={{ color: "#C9A84C", fontSize: 14, fontWeight: 700, background: "rgba(201,168,76,.1)", padding: "3px 10px", borderRadius: 3, border: `1px solid ${C.goldDk}` }}>📦 BBL : ${bbl.toFixed(3)}</span></div>}
               {i.export && <div style={{ marginTop: 4 }}><span style={{ color: C.greenLt, fontSize: 14, fontWeight: 700, background: "rgba(90,143,74,.15)", padding: "4px 12px", borderRadius: 3, border: `1px solid ${C.green}` }}>Exportateur ✓</span></div>}
             </div>
           </div></Card>; })}
@@ -811,6 +824,7 @@ function Admin({ data, setData }) {
               <div style={{ display: "grid", gap: 8 }}>
                 <select value={item.resourceId} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], resourceId: e.target.value }; setCf({ ...cf, items: ni }); }} style={sel}>{sellable.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}</select>
                 {cfPi && !cfPi.libre && cfPi.min != null && <span style={{ color: C.goldDk, fontSize: 13 }}>💲 Fourchette : {cfPi.min.toFixed(2)} – {cfPi.max.toFixed(2)} ${cfPi.export ? " (Export)" : ""}</span>}
+                {CATALOG_PRICES[item.resourceId] && <div style={{ marginTop: 2 }}><span style={{ color: C.goldLt, fontSize: 13 }}>🏷️ Prix catalogue : ${CATALOG_PRICES[item.resourceId].toFixed(2)}</span></div>}
                 {BBL_PRICES[item.resourceId] && <div style={{ marginTop: 2 }}><span style={{ color: "#C9A84C", fontSize: 13 }}>📦 Rachat BBL : ${BBL_PRICES[item.resourceId].toFixed(3)}</span></div>}
                 <div style={{ display: "flex", gap: 8 }}>
                   <input type="number" value={item.quantity} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], quantity: e.target.value }; setCf({ ...cf, items: ni }); }} placeholder="Quantité" style={{ ...inp, flex: 1 }} min="0" />
