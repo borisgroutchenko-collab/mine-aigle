@@ -202,6 +202,9 @@ function Admin({ data, setData }) {
   const [salaryEmpId, setSalaryEmpId] = useState(null);
   const [salaryAmount, setSalaryAmount] = useState("");
   const [salaryNote, setSalaryNote] = useState("");
+  const [editSalaryId, setEditSalaryId] = useState(null);
+  const [editSalaryAmount, setEditSalaryAmount] = useState("");
+  const [editSalaryNote, setEditSalaryNote] = useState("");
   const [editSaleId, setEditSaleId] = useState(null);
   const [editSaleQty, setEditSaleQty] = useState("");
   const [editConId, setEditConId] = useState(null);
@@ -242,7 +245,7 @@ function Admin({ data, setData }) {
   const weekExp = weekExpenses.reduce((s, x) => s + x.amount, 0);
   const weekProfit = weekRev - weekExp;
   const tabs = [
-    { id: "stocks", l: "📦 Stocks" }, { id: "employees", l: "🤠 Employés" }, { id: "productions", l: "⛏️ Extractions" },
+    { id: "stocks", l: "📦 Stocks" }, { id: "employees", l: "🤠 Employés" },
     { id: "craft", l: "🔨 Fabrication" }, { id: "contracts", l: "📜 Contrats" }, { id: "sales", l: "💰 Ventes" },
     { id: "expenses", l: "🧾 Dépenses" }, { id: "summary", l: "📊 Bilan" }, { id: "prices", l: "💲 Tarifs" },
   ];
@@ -257,13 +260,19 @@ function Admin({ data, setData }) {
   };
 
   const paySalary = async (empId) => {
-    const a = num(salaryAmount) || WORK_CONTRACT.pay;
+    const a = num(salaryAmount);
     if (!a || a <= 0) return;
     const emp = data.employees.find(e => e.id === empId);
-    const note = salaryNote || (num(salaryAmount) ? "" : "Contrat journalier");
-    const expense = { id: gid(), category: "Salaires", amount: a, description: `Salaire — ${emp?.name}${note ? ` (${note})` : ""}`, employeeId: empId, timestamp: Date.now() };
+    const expense = { id: gid(), category: "Salaires", amount: a, description: `Salaire — ${emp?.name}${salaryNote ? ` (${salaryNote})` : ""}`, employeeId: empId, timestamp: Date.now() };
     const u = { ...data, expenses: [...data.expenses, expense] };
     setData(u); await saveData(u); setSalaryEmpId(null); setSalaryAmount(""); setSalaryNote("");
+  };
+
+  const saveSalaryEdit = async () => {
+    const a = num(editSalaryAmount);
+    if (!a || a <= 0) return;
+    const u = { ...data, expenses: data.expenses.map(e => e.id === editSalaryId ? { ...e, amount: a, description: e.description.split("(")[0].trim() + (editSalaryNote ? ` (${editSalaryNote})` : "") } : e) };
+    setData(u); await saveData(u); setEditSalaryId(null); setEditSalaryAmount(""); setEditSalaryNote("");
   };
 
   const editSale = async (saleId) => {
@@ -446,60 +455,51 @@ function Admin({ data, setData }) {
 
                     {/* Salary section */}
                     <div style={{ marginTop: 12, padding: "14px", background: "rgba(0,0,0,.2)", borderRadius: 4, border: `1px solid ${C.border}` }}>
-                      <div style={{ color: C.gold, fontWeight: 700, fontSize: 16, fontFamily: "'Playfair Display',serif", marginBottom: 8 }}>📋 Contrat de travail — {WORK_CONTRACT.duration}</div>
-                      <div style={{ color: C.muted, fontSize: 14, marginBottom: 10 }}>Paye : <strong style={{ color: C.greenLt }}>${WORK_CONTRACT.pay.toFixed(2)}</strong> / jour — Conditions :</div>
-
-                      {/* Check today's production against requirements */}
-                      {(() => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const todayStart = today.getTime();
-                        const todayEnd = todayStart + 86400000;
-                        const todayProds = data.productions.filter(p => p.employeeName.toLowerCase() === emp.name.toLowerCase() && p.timestamp >= todayStart && p.timestamp < todayEnd);
-                        const todayTots = {};
-                        todayProds.forEach(p => { todayTots[p.resourceId] = (todayTots[p.resourceId] || 0) + p.quantity; });
-
-                        const allMet = WORK_CONTRACT.requirements.every(r => (todayTots[r.resourceId] || 0) >= r.minQty);
-
-                        return <>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            {WORK_CONTRACT.requirements.map(req => {
-                              const got = todayTots[req.resourceId] || 0;
-                              const met = got >= req.minQty;
-                              const item = ALL_ITEMS.find(x => x.id === req.resourceId);
-                              return <div key={req.resourceId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: met ? "rgba(90,143,74,.1)" : "rgba(155,48,48,.1)", borderRadius: 3, border: `1px solid ${met ? C.green : C.red}` }}>
-                                <span style={{ color: item?.color, fontSize: 15 }}>{item?.icon} {req.label}</span>
-                                <span style={{ color: met ? C.greenLt : C.redLt, fontWeight: 700, fontSize: 15 }}>{Math.floor(got)} / {req.minQty} {met ? "✓" : "✗"}</span>
-                              </div>;
-                            })}
-                          </div>
-                          <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ color: allMet ? C.greenLt : C.redLt, fontWeight: 700, fontSize: 15 }}>{allMet ? "✓ Quotas atteints aujourd'hui" : "✗ Quotas non atteints"}</span>
-                            <button onClick={() => paySalary(emp.id)} disabled={!allMet} style={{ ...btnP, padding: "8px 18px", fontSize: 13, opacity: allMet ? 1 : 0.4, cursor: allMet ? "pointer" : "not-allowed" }}>VALIDER LA PAYE ${WORK_CONTRACT.pay}</button>
-                          </div>
-                        </>;
-                      })()}
-
-                      {/* Salary history + manual salary */}
-                      <Divider />
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                        <span style={{ color: C.muted, fontSize: 15 }}>💰 Total versé : <strong style={{ color: C.gold, fontSize: 18 }}>${totalSalary.toFixed(2)}</strong></span>
-                        <button onClick={() => { setSalaryEmpId(salaryEmpId === emp.id ? null : emp.id); setSalaryAmount(""); setSalaryNote(""); }} style={{ ...btnS, padding: "4px 12px", fontSize: 12 }}>{salaryEmpId === emp.id ? "Annuler" : "+ Salaire libre"}</button>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: C.gold, fontWeight: 700, fontSize: 16, fontFamily: "'Playfair Display',serif" }}>💰 Salaires</span>
+                        <span style={{ color: C.muted, fontSize: 15 }}>Total : <strong style={{ color: C.gold, fontSize: 18 }}>${totalSalary.toFixed(2)}</strong></span>
                       </div>
+
+                      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                        <button onClick={() => { setSalaryEmpId(salaryEmpId === emp.id ? null : emp.id); setSalaryAmount(""); setSalaryNote(""); }} style={{ ...btnP, padding: "8px 16px", fontSize: 13 }}>{salaryEmpId === emp.id ? "ANNULER" : "+ VERSER UN SALAIRE"}</button>
+                      </div>
+
                       {salaryEmpId === emp.id && (
                         <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                          <input type="text" inputMode="decimal" value={salaryAmount} onChange={e => setSalaryAmount(e.target.value)} placeholder="Montant ($)" style={inp} min="0" step="0.01" />
+                          <input type="text" inputMode="decimal" value={salaryAmount} onChange={e => setSalaryAmount(e.target.value)} placeholder="Montant ($)" style={inp} />
                           <input value={salaryNote} onChange={e => setSalaryNote(e.target.value)} placeholder="Note (optionnel)" style={inp} />
-                          <button onClick={() => paySalary(emp.id)} style={{ ...btnP, padding: "8px 16px" }}>VERSER</button>
+                          <button onClick={() => paySalary(emp.id)} style={{ ...btnP, padding: "10px 20px" }}>VERSER</button>
                         </div>
                       )}
+
                       {empSalaries.length > 0 && (
-                        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-                          {empSalaries.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5).map(s => (
-                            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
-                              <span style={{ color: C.muted }}>{fmtDT(s.timestamp)} — <strong style={{ color: C.redLt }}>${s.amount.toFixed(2)}</strong>{s.description.includes("(") && <span style={{ color: C.dark }}> {s.description.split("(").slice(1).join("(").replace(")", "")}</span>}</span>
-                              <button onClick={() => rm("expenses", s.id)} style={{ ...btnD, padding: "2px 6px", fontSize: 11 }}>✕</button>
-                            </div>
+                        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                          {empSalaries.sort((a, b) => b.timestamp - a.timestamp).map(s => (
+                            editSalaryId === s.id ? (
+                              <div key={s.id} style={{ padding: 12, background: "rgba(139,58,26,.1)", borderRadius: 4, border: `2px solid ${C.accentLt}` }}>
+                                <div style={{ color: C.gold, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>✏️ Modifier ce salaire</div>
+                                <div style={{ display: "grid", gap: 8 }}>
+                                  <input type="text" inputMode="decimal" value={editSalaryAmount} onChange={e => setEditSalaryAmount(e.target.value)} placeholder="Nouveau montant ($)" style={inp} />
+                                  <input value={editSalaryNote} onChange={e => setEditSalaryNote(e.target.value)} placeholder="Note" style={inp} />
+                                  <div style={{ display: "flex", gap: 8 }}>
+                                    <button onClick={saveSalaryEdit} style={{ ...btnP, flex: 1, padding: "8px 14px", fontSize: 13 }}>SAUVEGARDER</button>
+                                    <button onClick={() => setEditSalaryId(null)} style={{ ...btnS, flex: 1, padding: "8px 14px", fontSize: 13 }}>ANNULER</button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "rgba(0,0,0,.15)", borderRadius: 3, border: `1px solid ${C.border}` }}>
+                                <div>
+                                  <span style={{ color: C.greenLt, fontWeight: 700, fontSize: 16 }}>${s.amount.toFixed(2)}</span>
+                                  <span style={{ color: C.dark, marginLeft: 10, fontSize: 13 }}>{fmtDT(s.timestamp)}</span>
+                                  {s.description.includes("(") && <span style={{ color: C.muted, marginLeft: 8, fontSize: 13 }}>{s.description.split("(").slice(1).join("(").replace(")", "")}</span>}
+                                </div>
+                                <div style={{ display: "flex", gap: 6 }}>
+                                  <button onClick={() => { setEditSalaryId(s.id); setEditSalaryAmount(String(s.amount)); setEditSalaryNote(""); }} style={{ ...btnS, padding: "2px 8px", fontSize: 11, color: C.gold, borderColor: C.goldDk }}>✏️</button>
+                                  <button onClick={() => rm("expenses", s.id)} style={{ ...btnD, padding: "2px 6px", fontSize: 11 }}>✕</button>
+                                </div>
+                              </div>
+                            )
                           ))}
                         </div>
                       )}
@@ -509,55 +509,6 @@ function Admin({ data, setData }) {
                 </div>
               </div></Card>;
             })}
-          </div>}
-      </div>}
-
-      {/* PRODUCTIONS */}
-      {tab === "productions" && <div style={{ animation: "fadeIn .4s" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}><Title icon="⛏️">Historique des Extractions</Title><button onClick={() => setModal("addProd")} style={btnP}>+ EXTRACTION</button></div>
-        {data.productions.length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucune extraction.</p>
-          : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {[...data.productions].sort((a, b) => b.timestamp - a.timestamp).slice(0, 50).map(p => { const r = ALL_ITEMS.find(x => x.id === p.resourceId);
-
-              if (editProdId === p.id) {
-                const delta = num(editProd.correction) || 0;
-                const newQty = p.quantity + delta;
-                return <Card key={p.id} style={{ border: `2px solid ${C.accentLt}` }}><div style={{ padding: 20 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <span style={{ color: C.gold, fontWeight: 700, fontSize: 16, fontFamily: "'Playfair Display',serif" }}>✏️ Corriger cette extraction</span>
-                    <span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(p.timestamp)}</span>
-                  </div>
-                  <div style={{ display: "grid", gap: 12 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "rgba(0,0,0,.2)", borderRadius: 4, border: `1px solid ${C.border}` }}>
-                      <span style={{ color: C.muted, fontSize: 16 }}>{p.employeeName} — {r?.icon} {r?.name}</span>
-                      <span style={{ color: C.goldLt, fontWeight: 700, fontSize: 20 }}>Actuel : {p.quantity}</span>
-                    </div>
-                    <div>{lbl("Correction (ex: 50 pour ajouter, -20 pour retirer)")}<input type="number" value={editProd.correction} onChange={e => setEditProd({ ...editProd, correction: e.target.value })} placeholder="Ex: 50 ou -20" style={inp} /></div>
-                    {editProd.correction !== "" && <div style={{ padding: "10px 14px", background: "rgba(0,0,0,.2)", borderRadius: 4, border: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ color: C.muted, fontSize: 15 }}>Nouveau total :</span>
-                      <span style={{ color: newQty > 0 ? C.greenLt : C.redLt, fontWeight: 700, fontSize: 22 }}>{newQty}</span>
-                    </div>}
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button onClick={saveProd} style={{ ...btnP, flex: 1, padding: "12px 20px" }}>CORRIGER</button>
-                      <button onClick={() => setEditProdId(null)} style={{ ...btnS, flex: 1, padding: "12px 20px" }}>ANNULER</button>
-                    </div>
-                  </div>
-                </div></Card>;
-              }
-
-              return (
-              <Row key={p.id}>
-                <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-                  <span style={{ color: C.gold, fontWeight: 700, fontSize: 18, minWidth: 120, fontFamily: "'Playfair Display',serif" }}>{p.employeeName}</span>
-                  <span style={{ color: r?.color, fontSize: 17 }}>{r?.icon} ×{p.quantity} {r?.name}</span>
-                  {p.note && <span style={{ color: C.dark, fontSize: 14 }}>({p.note})</span>}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(p.timestamp)}</span>
-                  <button onClick={() => { setEditProdId(p.id); setEditProd({ correction: "" }); }} style={{ ...btnS, padding: "4px 10px", fontSize: 13, color: C.gold, borderColor: C.goldDk }}>✏️</button>
-                  <button onClick={() => rm("productions", p.id)} style={{ ...btnD, padding: "4px 10px", fontSize: 13 }}>✕</button>
-                </div>
-              </Row>); })}
           </div>}
       </div>}
 
