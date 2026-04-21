@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/mine-aigle/static/js/main.9c9f5268.js",
+    "main.js": "/mine-aigle/static/js/main.d0e96b28.js",
     "index.html": "/mine-aigle/index.html",
-    "main.9c9f5268.js.map": "/mine-aigle/static/js/main.9c9f5268.js.map"
+    "main.d0e96b28.js.map": "/mine-aigle/static/js/main.d0e96b28.js.map"
   },
   "entrypoints": [
-    "static/js/main.9c9f5268.js"
+    "static/js/main.d0e96b28.js"
   ]
 }
