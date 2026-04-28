@@ -81,7 +81,7 @@ const WORK_CONTRACT = {
 
 const EXPENSE_CATEGORIES = ["Pioches & Outils","Dynamite & Explosifs","Bois de soutènement","Équipement de sécurité","Transport & Chariots","Salaires","Nourriture & Provisions","Divers","Taxes"];
 
-const initState = () => ({ employees: [], productions: [], crafts: [], contracts: [], sales: [], expenses: [], stockAdjustments: [] });
+const initState = () => ({ employees: [], productions: [], crafts: [], contracts: [], sales: [], expenses: [], stockAdjustments: [], coffreAmount: 0 });
 function gid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function num(v) { return parseFloat(String(v).replace(",", ".")); }
 function fmtDate(ts) { if (!ts) return "—"; return new Date(ts).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }); }
@@ -223,6 +223,8 @@ function Admin({ data, setData }) {
   const [adjQty, setAdjQty] = useState("");
   const [adjNote, setAdjNote] = useState("");
   const [weekOffset, setWeekOffset] = useState(0);
+  const [showCoffre, setShowCoffre] = useState(false);
+  const [coffreInput, setCoffreInput] = useState("");
 
   const stocks = computeStocks(data);
 
@@ -248,7 +250,7 @@ function Admin({ data, setData }) {
   const weekProfit = weekRev - weekExp;
   const tabs = [
     { id: "stocks", l: "📦 Stocks" }, { id: "employees", l: "🤠 Employés" },
-    { id: "craft", l: "🔨 Fabrication" }, { id: "contracts", l: "📜 Contrats" }, { id: "sales", l: "💰 Ventes" },
+    { id: "craft", l: "🔨 Fabrication" }, { id: "contracts", l: "📜 Contrats" },
     { id: "expenses", l: "🧾 Dépenses" }, { id: "summary", l: "📊 Bilan" }, { id: "prices", l: "💲 Tarifs" },
   ];
 
@@ -378,7 +380,14 @@ function Admin({ data, setData }) {
 
   const totalRev = data.sales.reduce((s, x) => s + x.totalPrice, 0);
   const totalExp = data.expenses.reduce((s, x) => s + x.amount, 0);
-  const profit = totalRev - totalExp;
+  const coffre = data.coffreAmount || 0;
+  const profit = totalRev - totalExp - coffre;
+
+  const saveCoffre = async () => {
+    const a = num(coffreInput); if (isNaN(a) || a < 0) return;
+    const u = { ...data, coffreAmount: a };
+    setData(u); await saveData(u); setCoffreInput("");
+  };
   const selRecipe = RECIPES.find(r => r.id === cr);
   const cMult = parseInt(cm) || 1;
   const sellable = ALL_ITEMS.filter(i => PRICE_INFO[i.id] && i.id !== "minerai_fer" && i.id !== "minerai_acier");
@@ -635,32 +644,6 @@ function Admin({ data, setData }) {
           </div>}
       </div>}
 
-      {/* SALES */}
-      {tab === "sales" && <div style={{ animation: "fadeIn .4s" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}><Title icon="💰">Ventes</Title><button onClick={() => setModal("addSale")} style={btnP}>+ VENTE</button></div>
-        {data.sales.length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucune vente.</p>
-          : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {[...data.sales].sort((a, b) => b.timestamp - a.timestamp).map(s => { const r = ALL_ITEMS.find(x => x.id === s.resourceId);
-              if (editSaleId === s.id) {
-                return <Card key={s.id} style={{ border: `2px solid ${C.accentLt}` }}><div style={{ padding: 20 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <span style={{ color: C.gold, fontWeight: 700, fontSize: 16, fontFamily: "'Playfair Display',serif" }}>✏️ Corriger la quantité</span>
-                    <span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(s.timestamp)} — {s.buyer}</span>
-                  </div>
-                  <div style={{ color: C.muted, fontSize: 15, marginBottom: 8 }}>{r?.icon} {r?.name} — Quantité actuelle : <strong style={{ color: C.goldLt }}>{s.quantity}</strong> @ ${s.pricePerUnit.toFixed(2)}/u</div>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <input type="number" value={editSaleQty} onChange={e => setEditSaleQty(e.target.value)} placeholder="Nouvelle quantité" style={{ ...inp, flex: 1 }} min="0" step="1" />
-                    <button onClick={() => editSale(s.id)} style={{ ...btnP, padding: "12px 20px" }}>CORRIGER</button>
-                    <button onClick={() => setEditSaleId(null)} style={{ ...btnS, padding: "12px 16px" }}>ANNULER</button>
-                  </div>
-                  {editSaleQty && <div style={{ color: C.muted, fontSize: 14, marginTop: 8 }}>Nouveau total : <strong style={{ color: C.greenLt }}>${((num(editSaleQty) || 0) * s.pricePerUnit).toFixed(2)}</strong> (diff stock : {((num(editSaleQty) || 0) - s.quantity) > 0 ? "+" : ""}{((num(editSaleQty) || 0) - s.quantity)})</div>}
-                </div></Card>;
-              }
-              return <Row key={s.id}><div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 18 }}><span style={{ color: C.greenLt, fontWeight: 700, fontSize: 22 }}>${s.totalPrice.toFixed(2)}</span><span style={{ color: C.dark }}>—</span><span style={{ color: r?.color }}>{r?.icon} ×{s.quantity} {r?.name}</span><span style={{ color: C.muted }}>→ {s.buyer}</span></div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(s.timestamp)}</span><button onClick={() => { setEditSaleId(s.id); setEditSaleQty(String(s.quantity)); }} style={{ ...btnS, padding: "4px 10px", fontSize: 13, color: C.gold, borderColor: C.goldDk }}>✏️</button><button onClick={() => rm("sales", s.id)} style={{ ...btnD, padding: "4px 10px", fontSize: 13 }}>✕</button></div></Row>;
-            })}
-          </div>}
-      </div>}
-
       {/* EXPENSES */}
       {tab === "expenses" && <div style={{ animation: "fadeIn .4s" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}><Title icon="🧾">Dépenses</Title><button onClick={() => setModal("addExpense")} style={btnP}>+ DÉPENSE</button></div>
@@ -768,10 +751,30 @@ function Admin({ data, setData }) {
         {/* Global totals */}
         <Divider />
         <h4 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, margin: "16px 0 14px" }}>Totaux depuis l'ouverture</h4>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 16, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 16, marginBottom: 16 }}>
           <Card><div style={{ padding: 20, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 15, marginBottom: 4 }}>Recettes totales</div><div style={{ color: C.greenLt, fontSize: 28, fontFamily: "'Playfair Display',serif", fontWeight: 900 }}>${totalRev.toFixed(2)}</div></div></Card>
           <Card><div style={{ padding: 20, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 15, marginBottom: 4 }}>Dépenses totales</div><div style={{ color: C.redLt, fontSize: 28, fontFamily: "'Playfair Display',serif", fontWeight: 900 }}>${totalExp.toFixed(2)}</div></div></Card>
-          <Card><div style={{ padding: 20, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 15, marginBottom: 4 }}>Bénéfice total</div><div style={{ color: profit >= 0 ? C.greenLt : C.redLt, fontSize: 28, fontFamily: "'Playfair Display',serif", fontWeight: 900 }}>{profit >= 0 ? "+" : ""}${profit.toFixed(2)}</div></div></Card>
+          <Card><div style={{ padding: 20, textAlign: "center" }}><div style={{ color: C.dark, fontSize: 15, marginBottom: 4 }}>Bénéfice disponible</div><div style={{ color: profit >= 0 ? C.greenLt : C.redLt, fontSize: 28, fontFamily: "'Playfair Display',serif", fontWeight: 900 }}>{profit >= 0 ? "+" : ""}${profit.toFixed(2)}</div></div></Card>
+        </div>
+
+        {/* Coffre - hidden by default */}
+        <div style={{ marginBottom: 24 }}>
+          <button onClick={() => setShowCoffre(!showCoffre)} style={{ ...btnS, padding: "8px 16px", fontSize: 14 }}>{showCoffre ? "🔒 Masquer le coffre" : "🔓 Afficher le coffre"}</button>
+          {showCoffre && (
+            <Card style={{ marginTop: 12 }}>
+              <div style={{ padding: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <span style={{ color: C.gold, fontWeight: 700, fontSize: 18, fontFamily: "'Playfair Display',serif" }}>🔒 Coffre</span>
+                  <span style={{ color: C.goldLt, fontSize: 28, fontFamily: "'Playfair Display',serif", fontWeight: 900 }}>${coffre.toFixed(2)}</span>
+                </div>
+                <div style={{ color: C.muted, fontSize: 14, marginBottom: 10 }}>Cette somme est déduite du bénéfice affiché ci-dessus. Bénéfice réel (avant mise au coffre) : <strong style={{ color: C.gold }}>${(totalRev - totalExp).toFixed(2)}</strong></div>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <input type="text" inputMode="decimal" value={coffreInput} onChange={e => setCoffreInput(e.target.value)} placeholder="Nouveau montant du coffre" style={{ ...inp, flex: 1 }} />
+                  <button onClick={saveCoffre} style={{ ...btnP, padding: "12px 20px" }}>MODIFIER</button>
+                </div>
+              </div>
+            </Card>
+          )}
         </div>
 
         <h4 style={{ color: C.gold, fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, margin: "0 0 14px" }}>Contrats actifs</h4>
@@ -905,6 +908,7 @@ export default function App() {
           sales: toArr(val.sales),
           expenses: toArr(val.expenses),
           stockAdjustments: toArr(val.stockAdjustments),
+          coffreAmount: val.coffreAmount || 0,
         });
       }
       setLoading(false);
