@@ -767,7 +767,7 @@ function Admin({ data, setData }) {
                   <span style={{ color: C.gold, fontWeight: 700, fontSize: 18, fontFamily: "'Playfair Display',serif" }}>🔒 Coffre</span>
                   <span style={{ color: C.goldLt, fontSize: 28, fontFamily: "'Playfair Display',serif", fontWeight: 900 }}>${coffre.toFixed(2)}</span>
                 </div>
-                <div style={{ color: C.muted, fontSize: 14, marginBottom: 10 }}>Cette somme est déduite du bénéfice affiché ci-dessus. Bénéfice réel (avant mise au coffre) : <strong style={{ color: C.gold }}>${(totalRev - totalExp).toFixed(2)}</strong></div>
+                <div style={{ color: C.muted, fontSize: 14, marginBottom: 10 }}>Somme totale (coffre + bénéfice disponible) : <strong style={{ color: C.gold, fontSize: 22 }}>${(coffre + profit).toFixed(2)}</strong></div>
                 <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                   <input type="text" inputMode="decimal" value={coffreInput} onChange={e => setCoffreInput(e.target.value)} placeholder="Nouveau montant du coffre" style={{ ...inp, flex: 1 }} />
                   <button onClick={saveCoffre} style={{ ...btnP, padding: "12px 20px" }}>MODIFIER</button>
