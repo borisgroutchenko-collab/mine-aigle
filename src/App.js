@@ -384,7 +384,8 @@ function Admin({ data, setData }) {
   const profit = totalRev - totalExp - coffre;
 
   const saveCoffre = async () => {
-    const a = num(coffreInput); if (isNaN(a) || a < 0) return;
+    const a = num(coffreInput);
+    if (isNaN(a) || a < 0) return;
     const u = { ...data, coffreAmount: a };
     setData(u); await saveData(u); setCoffreInput("");
   };
@@ -759,7 +760,7 @@ function Admin({ data, setData }) {
 
         {/* Coffre - hidden by default */}
         <div style={{ marginBottom: 24 }}>
-          <button onClick={() => setShowCoffre(!showCoffre)} style={{ ...btnS, padding: "8px 16px", fontSize: 14 }}>{showCoffre ? "🔒 Masquer le coffre" : "🔓 Afficher le coffre"}</button>
+          <button onClick={() => { setShowCoffre(!showCoffre); if (!showCoffre) setCoffreInput(String(coffre)); }} style={{ ...btnS, padding: "8px 16px", fontSize: 14 }}>{showCoffre ? "🔒 Masquer le coffre" : "🔓 Afficher le coffre"}</button>
           {showCoffre && (
             <Card style={{ marginTop: 12 }}>
               <div style={{ padding: 20 }}>
@@ -908,7 +909,7 @@ export default function App() {
           sales: toArr(val.sales),
           expenses: toArr(val.expenses),
           stockAdjustments: toArr(val.stockAdjustments),
-          coffreAmount: val.coffreAmount || 0,
+          coffreAmount: typeof val.coffreAmount === "number" ? val.coffreAmount : (num(val.coffreAmount) || 0),
         });
       }
       setLoading(false);
