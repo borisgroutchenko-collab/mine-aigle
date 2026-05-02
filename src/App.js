@@ -250,7 +250,7 @@ function Admin({ data, setData }) {
   const weekProfit = weekRev - weekExp;
   const tabs = [
     { id: "stocks", l: "📦 Stocks" }, { id: "employees", l: "🤠 Employés" },
-    { id: "craft", l: "🔨 Fabrication" }, { id: "contracts", l: "📜 Contrats" },
+    { id: "craft", l: "🔨 Fabrication" }, { id: "contracts", l: "📜 Contrats" }, { id: "sales", l: "💰 Ventes" },
     { id: "expenses", l: "🧾 Dépenses" }, { id: "summary", l: "📊 Bilan" }, { id: "prices", l: "💲 Tarifs" },
   ];
 
@@ -641,6 +641,32 @@ function Admin({ data, setData }) {
                   <span style={{ color: C.dark }}>Total : <strong style={{ color: C.gold }}>${totalVal.toFixed(2)}</strong></span>
                 </div>
               </div></Card>;
+            })}
+          </div>}
+      </div>}
+
+      {/* SALES */}
+      {tab === "sales" && <div style={{ animation: "fadeIn .4s" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}><Title icon="💰">Ventes</Title><button onClick={() => setModal("addSale")} style={btnP}>+ VENTE</button></div>
+        {data.sales.length === 0 ? <p style={{ color: C.dark, fontStyle: "italic", fontSize: 17 }}>Aucune vente.</p>
+          : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {[...data.sales].sort((a, b) => b.timestamp - a.timestamp).map(s => { const r = ALL_ITEMS.find(x => x.id === s.resourceId);
+              if (editSaleId === s.id) {
+                return <Card key={s.id} style={{ border: `2px solid ${C.accentLt}` }}><div style={{ padding: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <span style={{ color: C.gold, fontWeight: 700, fontSize: 16, fontFamily: "'Playfair Display',serif" }}>✏️ Corriger la quantité</span>
+                    <span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(s.timestamp)} — {s.buyer}</span>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 15, marginBottom: 8 }}>{r?.icon} {r?.name} — Quantité actuelle : <strong style={{ color: C.goldLt }}>{s.quantity}</strong> @ ${s.pricePerUnit.toFixed(2)}/u</div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <input type="number" value={editSaleQty} onChange={e => setEditSaleQty(e.target.value)} placeholder="Nouvelle quantité" style={{ ...inp, flex: 1 }} min="0" step="1" />
+                    <button onClick={() => editSale(s.id)} style={{ ...btnP, padding: "12px 20px" }}>CORRIGER</button>
+                    <button onClick={() => setEditSaleId(null)} style={{ ...btnS, padding: "12px 16px" }}>ANNULER</button>
+                  </div>
+                  {editSaleQty && <div style={{ color: C.muted, fontSize: 14, marginTop: 8 }}>Nouveau total : <strong style={{ color: C.greenLt }}>${((num(editSaleQty) || 0) * s.pricePerUnit).toFixed(2)}</strong></div>}
+                </div></Card>;
+              }
+              return <Row key={s.id}><div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 18 }}><span style={{ color: C.greenLt, fontWeight: 700, fontSize: 22 }}>${s.totalPrice.toFixed(2)}</span><span style={{ color: C.dark }}>—</span><span style={{ color: r?.color }}>{r?.icon} ×{s.quantity} {r?.name}</span><span style={{ color: C.muted }}>→ {s.buyer}</span></div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: C.dark, fontSize: 13 }}>{fmtDT(s.timestamp)}</span><button onClick={() => { setEditSaleId(s.id); setEditSaleQty(String(s.quantity)); }} style={{ ...btnS, padding: "4px 10px", fontSize: 13, color: C.gold, borderColor: C.goldDk }}>✏️</button><button onClick={() => rm("sales", s.id)} style={{ ...btnD, padding: "4px 10px", fontSize: 13 }}>✕</button></div></Row>;
             })}
           </div>}
       </div>}
