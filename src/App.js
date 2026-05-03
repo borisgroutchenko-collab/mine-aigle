@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { saveData, listenData } from "./firebase";
+import { saveData, saveCoffreFirebase, listenData } from "./firebase";
 
 const ADMIN_CODE = "Aigle1899";
 
@@ -386,8 +386,9 @@ function Admin({ data, setData }) {
   const saveCoffre = async () => {
     const a = num(coffreInput);
     if (isNaN(a) || a < 0) return;
-    const u = { ...data, coffreAmount: a };
-    setData(u); await saveData(u); setCoffreInput("");
+    setData({ ...data, coffreAmount: a });
+    await saveCoffreFirebase(a);
+    setCoffreInput("");
   };
   const selRecipe = RECIPES.find(r => r.id === cr);
   const cMult = parseInt(cm) || 1;
@@ -925,7 +926,7 @@ export default function App() {
 
   useEffect(() => {
     const toArr = (v) => { if (!v) return []; if (Array.isArray(v)) return v.filter(Boolean); return Object.values(v).filter(Boolean); };
-    const unsubscribe = listenData((val) => {
+    const unsubscribe = listenData((val, coffreVal) => {
       if (val) {
         setData({
           employees: toArr(val.employees),
@@ -935,7 +936,7 @@ export default function App() {
           sales: toArr(val.sales),
           expenses: toArr(val.expenses),
           stockAdjustments: toArr(val.stockAdjustments),
-          coffreAmount: typeof val.coffreAmount === "number" ? val.coffreAmount : (num(val.coffreAmount) || 0),
+          coffreAmount: coffreVal || 0,
         });
       }
       setLoading(false);
