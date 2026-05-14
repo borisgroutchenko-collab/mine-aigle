@@ -33,14 +33,14 @@ const RECIPES = [
 ];
 
 const PRICE_INFO = {
-  minerai_soufre: { min: 1, max: 1.2, export: false },
-  amas_soufre: { min: 1, max: 1.2, export: true },
-  lingot_fer: { min: 1.3, max: 1.5, export: true },
-  lingot_acier: { min: 1.4, max: 1.6, export: true },
-  charbon: { min: 0.8, max: 1, export: true },
-  tete_outil: { min: 3, max: 3.3, export: false },
-  clous: { min: 0, max: 0.2, export: false },
-  jarres: { min: 0, max: 0.05, export: false },
+  minerai_soufre: { min: null, max: null, export: false, libre: true },
+  amas_soufre: { min: 0.80, max: 0.96, export: true },
+  lingot_fer: { min: 0.40, max: 0.48, export: true },
+  lingot_acier: { min: 1.10, max: 1.32, export: true },
+  charbon: { min: 0.05, max: 0.06, export: true },
+  tete_outil: { min: 1.00, max: 1.20, export: false },
+  clous: { min: 0.10, max: 0.12, export: false },
+  jarres: { min: 0.10, max: 0.12, export: false },
   pioches: { min: null, max: null, export: false, libre: true },
   minerai_fer: { min: null, max: null, export: false, libre: true },
   minerai_acier: { min: null, max: null, export: false, libre: true },
