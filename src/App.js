@@ -27,9 +27,9 @@ const RECIPES = [
   { id: "craft_lingot_fer", inputs: [{ itemId: "minerai_fer", qty: 5 }], outputs: [{ itemId: "lingot_fer", qty: 1 }], description: "5 minerais de fer → 1 lingot de fer" },
   { id: "craft_lingot_acier", inputs: [{ itemId: "minerai_acier", qty: 5 }], outputs: [{ itemId: "lingot_acier", qty: 1 }], description: "5 minerais d'acier → 1 lingot d'acier" },
   { id: "craft_amas_soufre", inputs: [{ itemId: "minerai_soufre", qty: 5 }], outputs: [{ itemId: "amas_soufre", qty: 1 }], description: "5 minerais de soufre → 1 soufre" },
-  { id: "craft_tete_outil", inputs: [{ itemId: "lingot_acier", qty: 2 }], outputs: [{ itemId: "tete_outil", qty: 1 }], description: "2 lingots d'acier → 1 tête d'outil" },
-  { id: "craft_clous", inputs: [{ itemId: "lingot_fer", qty: 5 }], outputs: [{ itemId: "clous", qty: 50 }], description: "5 lingots de fer → 50 clous" },
-  { id: "craft_jarres", inputs: [{ itemId: "lingot_fer", qty: 2 }], outputs: [{ itemId: "jarres", qty: 20 }], description: "2 lingots de fer → 20 jarres vides" },
+  { id: "craft_tete_outil", inputs: [{ itemId: "minerai_acier", qty: 2 }], outputs: [{ itemId: "tete_outil", qty: 1 }], description: "2 minerais d'acier → 1 tête d'outil" },
+  { id: "craft_clous", inputs: [{ itemId: "minerai_fer", qty: 10 }, { itemId: "minerai_acier", qty: 5 }], outputs: [{ itemId: "clous", qty: 20 }], description: "10 minerais de fer + 5 minerais d'acier → 20 clous" },
+  { id: "craft_jarres", inputs: [{ itemId: "minerai_fer", qty: 1 }], outputs: [{ itemId: "jarres", qty: 10 }], description: "1 minerai de fer → 10 jarres vides" },
 ];
 
 const PRICE_INFO = {
@@ -48,19 +48,20 @@ const PRICE_INFO = {
 };
 
 const BBL_PRICES = {
-  charbon: 0.385,
-  amas_soufre: 0.485,
-  lingot_acier: 0.685,
-  lingot_fer: 0.635,
+  charbon: "?",
+  amas_soufre: "?",
+  lingot_acier: "?",
+  lingot_fer: "?",
 };
 
 const CATALOG_PRICES = {
-  lingot_fer: 1.40,
-  lingot_acier: 1.45,
-  amas_soufre: 1.20,
-  charbon: 1.00,
-  tete_outil: 3.20,
-  jarres: 0.05,
+  lingot_fer: 0.48,
+  lingot_acier: 1.32,
+  amas_soufre: 0.96,
+  charbon: 0.06,
+  tete_outil: 1.20,
+  jarres: 0.12,
+  clous: 0.12,
 };
 
 const SALARY_RATES = {
@@ -166,7 +167,7 @@ function PriceReminder({ rid }) {
       {i.libre ? <span style={{ color: C.gold, fontWeight: 700 }}>Prix libre</span> : <span style={{ color: C.gold, fontWeight: 700, fontSize: 17 }}>${i.min?.toFixed(2)} – ${i.max?.toFixed(2)}</span>}
       {i.export && <span style={{ color: C.greenLt, marginLeft: 8, fontSize: 12, fontWeight: 700 }}>(Exportateur ✓)</span>}</div>
       {cat && <div style={{ marginTop: 6 }}><span style={{ color: C.muted, fontSize: 14 }}>🏷️ Prix catalogue : </span><span style={{ color: C.goldLt, fontWeight: 700, fontSize: 16 }}>${cat.toFixed(2)}</span></div>}
-      {bbl && <div style={{ marginTop: 4 }}><span style={{ color: C.muted, fontSize: 14 }}>📦 Rachat BBL : </span><span style={{ color: "#C9A84C", fontWeight: 700, fontSize: 16 }}>${bbl.toFixed(3)}</span></div>}
+      {bbl && <div style={{ marginTop: 4 }}><span style={{ color: C.muted, fontSize: 14 }}>📦 Rachat BBL : </span><span style={{ color: "#C9A84C", fontWeight: 700, fontSize: 16 }}>${bbl}</span></div>}
     </div>
   );
 }
@@ -590,7 +591,7 @@ function Admin({ data, setData }) {
                           <select value={item.resourceId} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], resourceId: e.target.value }; setEditCon({ ...editCon, items: ni }); }} style={sel}>{sellable.map(r2 => <option key={r2.id} value={r2.id}>{r2.icon} {r2.name}</option>)}</select>
                           {ecPi && !ecPi.libre && ecPi.min != null && <span style={{ color: C.goldDk, fontSize: 13 }}>💲 {ecPi.min.toFixed(2)} – {ecPi.max.toFixed(2)} $</span>}
                           {CATALOG_PRICES[item.resourceId] && <span style={{ color: C.goldLt, fontSize: 13, marginLeft: 8 }}>🏷️ Catalogue : ${CATALOG_PRICES[item.resourceId].toFixed(2)}</span>}
-                          {BBL_PRICES[item.resourceId] && <span style={{ color: "#C9A84C", fontSize: 13, marginLeft: 8 }}>📦 BBL : ${BBL_PRICES[item.resourceId].toFixed(3)}</span>}
+                          {BBL_PRICES[item.resourceId] && <span style={{ color: "#C9A84C", fontSize: 13, marginLeft: 8 }}>📦 BBL : ${BBL_PRICES[item.resourceId]}</span>}
                           <div style={{ display: "flex", gap: 8 }}>
                             <input type="number" value={item.totalQuantity} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], totalQuantity: e.target.value }; setEditCon({ ...editCon, items: ni }); }} placeholder="Qté" style={{ ...inp, flex: 1 }} min="0" />
                             <input type="text" inputMode="decimal" value={item.pricePerUnit} onChange={e => { const ni = [...editCon.items]; ni[idx] = { ...ni[idx], pricePerUnit: e.target.value }; setEditCon({ ...editCon, items: ni }); }} placeholder="Prix/u" style={{ ...inp, flex: 1 }} min="0" step="0.01" />
@@ -711,7 +712,7 @@ function Admin({ data, setData }) {
             <div style={{ textAlign: "right" }}>
               {i.libre ? <span style={{ color: C.muted, fontSize: 17, fontStyle: "italic" }}>Prix libre</span> : <span style={{ color: C.goldLt, fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700 }}>${i.min?.toFixed(2)} – ${i.max?.toFixed(2)}</span>}
               {cat && <div style={{ marginTop: 4 }}><span style={{ color: C.goldLt, fontSize: 14, fontWeight: 700, background: "rgba(232,213,163,.1)", padding: "3px 10px", borderRadius: 3, border: `1px solid ${C.goldDk}` }}>🏷️ Catalogue : ${cat.toFixed(2)}</span></div>}
-              {bbl && <div style={{ marginTop: 4 }}><span style={{ color: "#C9A84C", fontSize: 14, fontWeight: 700, background: "rgba(201,168,76,.1)", padding: "3px 10px", borderRadius: 3, border: `1px solid ${C.goldDk}` }}>📦 BBL : ${bbl.toFixed(3)}</span></div>}
+              {bbl && <div style={{ marginTop: 4 }}><span style={{ color: "#C9A84C", fontSize: 14, fontWeight: 700, background: "rgba(201,168,76,.1)", padding: "3px 10px", borderRadius: 3, border: `1px solid ${C.goldDk}` }}>📦 BBL : ${bbl}</span></div>}
               {i.export && <div style={{ marginTop: 4 }}><span style={{ color: C.greenLt, fontSize: 14, fontWeight: 700, background: "rgba(90,143,74,.15)", padding: "4px 12px", borderRadius: 3, border: `1px solid ${C.green}` }}>Exportateur ✓</span></div>}
             </div>
           </div></Card>; })}
@@ -836,7 +837,7 @@ function Admin({ data, setData }) {
                 <select value={item.resourceId} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], resourceId: e.target.value }; setCf({ ...cf, items: ni }); }} style={sel}>{sellable.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}</select>
                 {cfPi && !cfPi.libre && cfPi.min != null && <span style={{ color: C.goldDk, fontSize: 13 }}>💲 Fourchette : {cfPi.min.toFixed(2)} – {cfPi.max.toFixed(2)} ${cfPi.export ? " (Export)" : ""}</span>}
                 {CATALOG_PRICES[item.resourceId] && <div style={{ marginTop: 2 }}><span style={{ color: C.goldLt, fontSize: 13 }}>🏷️ Prix catalogue : ${CATALOG_PRICES[item.resourceId].toFixed(2)}</span></div>}
-                {BBL_PRICES[item.resourceId] && <div style={{ marginTop: 2 }}><span style={{ color: "#C9A84C", fontSize: 13 }}>📦 Rachat BBL : ${BBL_PRICES[item.resourceId].toFixed(3)}</span></div>}
+                {BBL_PRICES[item.resourceId] && <div style={{ marginTop: 2 }}><span style={{ color: "#C9A84C", fontSize: 13 }}>📦 Rachat BBL : ${BBL_PRICES[item.resourceId]}</span></div>}
                 <div style={{ display: "flex", gap: 8 }}>
                   <input type="number" value={item.quantity} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], quantity: e.target.value }; setCf({ ...cf, items: ni }); }} placeholder="Quantité" style={{ ...inp, flex: 1 }} min="0" />
                   <input type="text" inputMode="decimal" value={item.pricePerUnit} onChange={e => { const ni = [...cf.items]; ni[idx] = { ...ni[idx], pricePerUnit: e.target.value }; setCf({ ...cf, items: ni }); }} placeholder="Prix/unité ($)" style={{ ...inp, flex: 1 }} min="0" step="0.01" />
